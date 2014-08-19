@@ -70,10 +70,10 @@ sub _SubBytes {
                 ( hex($y) * 16 ) + hex($x)
             ]);
 
-            ### Row Index     : ( $row_index )
-            ### Column Index  : ( $column_index )
-            ### X Coordinate      : ( $x )
-            ### Y Coordinate      : ( $y )
+            ### Row Index        : ( $row_index )
+            ### Column Index     : ( $column_index )
+            ### X Coordinate     : ( $x )
+            ### Y Coordinate     : ( $y )
             ### Original Byte    : ( unpack "H2", $original_byte )
             ### Substituted Byte : ( unpack "H2", $substituted_byte )
 

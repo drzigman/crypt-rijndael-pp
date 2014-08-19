@@ -26,18 +26,10 @@ Readonly my @EXPECTED_OUTPUT => (
 );
 
 subtest "Perform SubBytes on Input State" => sub {
-    my $packed_input = "";
-    for my $value ( @INPUT ) {
-        $packed_input .= pack( "C", $value );
-    }
-
+    my $packed_input = pack( "C*", @INPUT );
     my $state = Crypt::Rijndael::PP->_input_to_state( $packed_input );
 
-    my $packed_expected_output = "";
-    for my $value ( @EXPECTED_OUTPUT ) {
-        $packed_expected_output .= pack( "C", $value );
-    }
-
+    my $packed_expected_output = pack( "C*", @EXPECTED_OUTPUT ); 
     my $expected_state = Crypt::Rijndael::PP->_input_to_state(
         $packed_expected_output
     );
