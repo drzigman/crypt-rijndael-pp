@@ -6,6 +6,7 @@ use warnings;
 use bytes;
 
 use Smart::Comments -ENV;
+use Data::Dumper;
 use Carp;
 
 use Readonly;
@@ -109,7 +110,134 @@ sub _shift_row {
 }
 
 sub _MixColumns {
+    my $self  = shift;
+    my $state = shift;
 
+
+}
+
+sub _mix_column {
+    my $self   = shift;
+    my $column = shift;
+
+    my $s0 = $column->[0];
+    my $s1 = $column->[1];
+    my $s2 = $column->[2];
+    my $s3 = $column->[3];
+
+    return $column;
+}
+
+sub _gf_multiplication {
+    my $self = shift;
+    my $left_factor  = shift;
+    my $right_factor = shift;
+
+    my $left_factor_bits          = unpack( "B*", $left_factor );
+    my $reversed_left_factor_bits = reverse $left_factor_bits;
+
+    my $right_factor_bits          = unpack( "B*", $right_factor );
+    my $reversed_right_factor_bits = reverse $right_factor_bits;
+
+    ### Left Factor Bits           : ( $left_factor_bits )
+    ### Reversed Left Factor Bits  : ( $reversed_left_factor_bits )
+    ### Left Factor Expression     : ( $self->_generate_formatted_expression( $left_factor_bits ) )
+    ### Right Factor Bits          : ( $right_factor_bits )
+    ### Reversed Right Factor Bits : ( $reversed_right_factor_bits )
+    ### Right Factor Expression    : ( $self->_generate_formatted_expression( $right_factor_bits ) )
+
+    my @resultant_terms;
+    for( my $left_factor_bit_index = 0;
+        $left_factor_bit_index < length( $reversed_left_factor_bits );
+        $left_factor_bit_index++ ) {
+
+        my $left_factor_bit = substr( $reversed_left_factor_bits, $left_factor_bit_index, 1 );
+
+        if( $left_factor_bit eq "0" ) {
+            next;
+        }
+
+        for( my $right_factor_bit_index = 0;
+            $right_factor_bit_index < length( $reversed_right_factor_bits );
+            $right_factor_bit_index++ ) {
+
+            my $right_factor_bit = substr( $reversed_right_factor_bits, $right_factor_bit_index, 1 );
+
+            if( $right_factor_bit eq "0" ) {
+                next;
+            }
+
+            my $result = "1" . ( "0" x ($left_factor_bit_index + $right_factor_bit_index) );
+            $result = ("0" x (
+                ( length($reversed_left_factor_bits) + length( $reversed_right_factor_bits ) - 2 )
+                - ( $left_factor_bit_index + $right_factor_bit_index )
+            ) . $result );
+
+            push @resultant_terms, $result;
+        }
+
+    }
+
+    ### Raw Resultant Terms      : ( map { $_ } sort @resultant_terms )
+    ### Formatted Resultant Terms: ( map { $self->_generate_formatted_expression( $_ ) } sort @resultant_terms )
+
+    # Simply the expression
+    my %orders = ();
+    for my $term ( @resultant_terms ) {
+        if( !exists $orders{$term} ) {
+            $orders{$term} = 0;
+        }
+
+        $orders{$term}++;
+    }
+
+    my @simplified_terms;
+    for my $term ( keys %orders ) {
+        if( $orders{$term} % 2 == 0 ) {
+            next;
+        }
+
+        push @simplified_terms, $term;
+    }
+
+    ### Raw Simplified Terms       : ( map { $_ } sort @simplified_terms )
+    ### Formatted Simplified Terms : ( map { $self->_generate_formatted_expression( $_ ) } sort @simplified_terms )
+
+    my $resultant_expression = 0;
+    for my $simplified_term ( @simplified_terms ) {
+        my $binary_term = pack( "a*", $simplified_term );
+        $resultant_expression = $resultant_expression ^ $binary_term;
+    }
+
+    ### Resultant Expression: ( unpack( "B*", $resultant_expression ) )
+
+    # TODO: Mod the result
+
+    my $resultant_bits = "";
+    ### Resultant Bits: ( $resultant_bits )
+
+    return $left_factor;
+}
+
+sub _generate_formatted_expression {
+    my $self       = shift;
+    my $expression = shift;
+
+    my $reversed_expression  = reverse $expression;
+    my $formatted_expression = "";
+
+    for( my $bit_index = 0; $bit_index < length( $reversed_expression ); $bit_index++ ) {
+        my $bit = substr( $reversed_expression, $bit_index, 1 );
+
+        if( $bit eq '0' ) {
+            next;
+        }
+
+        $formatted_expression = "x^" . ( $bit_index ) . " " . $formatted_expression;
+    }
+
+    chop $formatted_expression; # Remove the trailing space
+    return $formatted_expression;
 }
 
 sub _AddRoundKey {
