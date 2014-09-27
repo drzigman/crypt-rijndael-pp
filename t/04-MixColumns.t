@@ -26,6 +26,17 @@ Readonly my @EXPECTED_OUTPUT => (
     0x28, 0x06, 0x26, 0x4c,
 );
 
+Readonly my $DIVIDEND => "0010101101111001";
+Readonly my $DIVISOR  => "0000000100011011";
+Readonly my $MODULO   => "0000000011000001";
+
+Readonly my $GF_MULTIPLICATION_TEST_VALUES => [
+    { arg1 => 0x57, arg2 => 0x83, result => 0xc1 },
+    { arg1 => 0x02, arg2 => 0xd4, result => 0xb3 },
+    { arg1 => 0x02, arg2 => 0x03, result => 0x06 },
+    { arg1 => 0x03, arg2 => 0xf1, result => 0x08 },
+];
+
 Readonly my $LEFT_FACTOR  => 0x57;
 Readonly my $RIGHT_FACTOR => 0x83;
 Readonly my $GF_PRODUCT   => 0xc1;
@@ -33,56 +44,74 @@ Readonly my $GF_PRODUCT   => 0xc1;
 Readonly my @COLUMN       => ( 0xd4, 0xbf, 0x5d, 0x30 );
 Readonly my @MIXED_COLUMN => ( 0x04, 0x66, 0x81, 0xe5 );
 
-subtest "Multiple Values in GF(2^8)" => sub {
-    my $left_factor  = pack( "C*", $LEFT_FACTOR );
-    my $right_factor = pack( "C*", $RIGHT_FACTOR );
-    my $expected_gf_product = pack( "C*", $GF_PRODUCT );
+subtest "Polynomial Modulus" => sub {
+    my $dividend = pack( "B16", $DIVIDEND );
+    my $divisor  = pack( "B16", $DIVISOR );
 
-    my $gf_product;
+    my $result_modulo;
     lives_ok {
-        $gf_product = Crypt::Rijndael::PP->_gf_multiplication(
-            $left_factor, $right_factor
-        );
-    } "Lives through GF Multiplication";
+        $result_modulo = Crypt::Rijndael::PP->_pmod( $dividend, $divisor );
+    } "Lives through polynomial modulus operation";
 
-    is_deeply( $gf_product, $expected_gf_product,
-        "Correct gf multiplication product" );
+    cmp_ok(
+        unpack( "H2", $result_modulo ), 'eq',
+        unpack( "x1H2", pack( "B16", $MODULO ) ),
+        "Correct result");
 };
 
-done_testing;
-exit;
+subtest "Multiple Values in GF(2^8)" => sub {
+    for my $test_values (@{ $GF_MULTIPLICATION_TEST_VALUES }) {
+        my $arg1   = $test_values->{'arg1'};
+        my $arg2   = $test_values->{'arg2'};
+        my $result = $test_values->{'result'};
+
+        my $subtest_name = sprintf("GF(2^8) - %#04x * %#04x = %#04x",
+            $arg1, $arg2, $result );
+
+        subtest $subtest_name => sub {
+            my $gf_product;
+            lives_ok {
+                $gf_product = Crypt::Rijndael::PP->_gf_multiplication(
+                    pack( "n", $arg1 ), pack( "n", $arg2 )
+                );
+            } "Lives through GF Multiplication";
+
+            cmp_ok(
+                unpack( "H2", $gf_product ), 'eq',
+                unpack( "x1H2", pack( "n", $result ) ),
+                "Correct gf multiplication product" );
+        }
+    }
+};
 
 subtest "Mix Individual Column" => sub {
-    my $packed_column       = pack( "C*", @COLUMN );
-    my $packed_mixed_column = pack( "C*", @MIXED_COLUMN );
-
-    my $unmixed_column = [
-        unpack("x0a", $packed_column),
-        unpack("x1a", $packed_column),
-        unpack("x2a", $packed_column),
-        unpack("x3a", $packed_column),
+    my $initial_column = [
+        pack( "n", $COLUMN[0] ),
+        pack( "n", $COLUMN[1] ),
+        pack( "n", $COLUMN[2] ),
+        pack( "n", $COLUMN[3] ),
     ];
 
-    my $column = $unmixed_column;
-
+    my $mixed_column;
     lives_ok {
-        Crypt::Rijndael::PP->_mix_column( $column );
+        $mixed_column = Crypt::Rijndael::PP->_mix_column( $initial_column );
     } "Lives through column mixing";
 
-    is_deeply( $column, [
-        unpack("x0a", $packed_mixed_column),
-        unpack("x1a", $packed_mixed_column),
-        unpack("x2a", $packed_mixed_column),
-        unpack("x3a", $packed_mixed_column),
+    is_deeply( $mixed_column, [
+        pack( "C", $MIXED_COLUMN[0] ),
+        pack( "C", $MIXED_COLUMN[1] ),
+        pack( "C", $MIXED_COLUMN[2] ),
+        pack( "C", $MIXED_COLUMN[3] ),
     ], "Correct Resultant Column" );
 };
-
-done_testing;
-exit;
 
 subtest "Perform Mix Columns on Input State" => sub {
     my $packed_input = pack( "C*", @INPUT );
     my $state = Crypt::Rijndael::PP->_input_to_state( $packed_input );
+
+    note("Original State:\n");
+    note( Crypt::Rijndael::PP->_print_formatted_state( $state ) );
+
 
     my $packed_expected_output = pack( "C*", @EXPECTED_OUTPUT );
     my $expected_state = Crypt::Rijndael::PP->_input_to_state(
@@ -93,9 +122,6 @@ subtest "Perform Mix Columns on Input State" => sub {
     lives_ok {
         $updated_state = Crypt::Rijndael::PP->_MixColumns( $state );
     } "Lives through ShiftRows";
-
-    note("Original State:\n");
-    note( Crypt::Rijndael::PP->_print_formatted_state( $state ) );
 
     note("Updated State:\n");
     note( Crypt::Rijndael::PP->_print_formatted_state( $updated_state ) );

@@ -15,11 +15,9 @@ Readonly my $SHORT_STRING => "ABCDE";
 Readonly my $LONG_STRING  => "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 subtest "Convert 128 Bit Input to State" => sub {
-    my $input = pack("a*", $STRING);
     my $state;
-    
     lives_ok {
-        $state = Crypt::Rijndael::PP->_input_to_state( $input );
+        $state = Crypt::Rijndael::PP->_input_to_state( $STRING );
     } "Lives through conversion";
 
     if( !defined $state ) {
@@ -36,7 +34,7 @@ subtest "Convert 128 Bit Input to State" => sub {
 
             my $input_byte = unpack( "x"
                 . ( $row_index + ( $column_index * 4 ) )
-                . "H2", $input );
+                . "H2", $STRING );
 
             cmp_ok( $state_byte, 'eq', $input_byte,
                 "Correct State Byte at $row_index x $column_index" );
@@ -45,23 +43,15 @@ subtest "Convert 128 Bit Input to State" => sub {
 };
 
 subtest "Convert Less than 128 Bit Input to State" => sub {
-    my $input = pack( "a*", $SHORT_STRING );
-
-    my $state;
-    
     throws_ok {
-        $state = Crypt::Rijndael::PP->_input_to_state( $input );
+        Crypt::Rijndael::PP->_input_to_state( $SHORT_STRING );
     } qr/Invalid Input Length, Must be 128 Bits/,
     "Dies with invalid input size";
 };
 
 subtest "Convert More than 128 Bit Input to State" => sub {
-    my $input = pack( "a*", $LONG_STRING );
-
-    my $state;
-    
     throws_ok {
-        $state = Crypt::Rijndael::PP->_input_to_state( $input );
+        Crypt::Rijndael::PP->_input_to_state( $LONG_STRING );
     } qr/Invalid Input Length, Must be 128 Bits/,
     "Dies with invalid input size";
 };
