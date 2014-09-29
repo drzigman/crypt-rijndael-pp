@@ -1,0 +1,109 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+use Test::More;
+use Test::Exception;
+
+use Crypt::Rijndael::PP;
+
+use Readonly;
+
+Readonly my @KEY_128_BIT => (
+    0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c
+);
+
+Readonly my @EXPANDED_KEY_128_BIT => (
+
+);
+
+=cut
+Readonly my @KEY_128_BIT => (
+    0x69, 0x20, 0xe2, 0x99, 0xa5, 0x20, 0x2a, 0x6d, 0x65, 0x6e, 0x63, 0x68, 0x69, 0x74, 0x6f, 0x2a
+);
+
+Readonly my @EXPANDED_KEY_128_BIT => (
+    0x69, 0x20, 0xe2, 0x99, 0xa5, 0x20, 0x2a, 0x6d, 0x65, 0x6e, 0x63, 0x68, 0x69, 0x74, 0x6f, 0x2a,
+    0xfa, 0x88, 0x07, 0x60, 0x5f, 0xa8, 0x2d, 0x0d, 0x3a, 0xc6, 0x4e, 0x65, 0x53, 0xb2, 0x21, 0x4f,
+    0xcf, 0x75, 0x83, 0x8d, 0x90, 0xdd, 0xae, 0x80, 0xaa, 0x1b, 0xe0, 0xe5, 0xf9, 0xa9, 0xc1, 0xaa,
+    0x18, 0x0d, 0x2f, 0x14, 0x88, 0xd0, 0x81, 0x94, 0x22, 0xcb, 0x61, 0x71, 0xdb, 0x62, 0xa0, 0xdb,
+    0xba, 0xed, 0x96, 0xad, 0x32, 0x3d, 0x17, 0x39, 0x10, 0xf6, 0x76, 0x48, 0xcb, 0x94, 0xd6, 0x93,
+    0x88, 0x1b, 0x4a, 0xb2, 0xba, 0x26, 0x5d, 0x8b, 0xaa, 0xd0, 0x2b, 0xc3, 0x61, 0x44, 0xfd, 0x50,
+    0xb3, 0x4f, 0x19, 0x5d, 0x09, 0x69, 0x44, 0xd6, 0xa3, 0xb9, 0x6f, 0x15, 0xc2, 0xfd, 0x92, 0x45,
+    0xa7, 0x00, 0x77, 0x78, 0xae, 0x69, 0x33, 0xae, 0x0d, 0xd0, 0x5c, 0xbb, 0xcf, 0x2d, 0xce, 0xfe,
+    0xff, 0x8b, 0xcc, 0xf2, 0x51, 0xe2, 0xff, 0x5c, 0x5c, 0x32, 0xa3, 0xe7, 0x93, 0x1f, 0x6d, 0x19,
+    0x24, 0xb7, 0x18, 0x2e, 0x75, 0x55, 0xe7, 0x72, 0x29, 0x67, 0x44, 0x95, 0xba, 0x78, 0x29, 0x8c,
+    0xae, 0x12, 0x7c, 0xda, 0xdb, 0x47, 0x9b, 0xa8, 0xf2, 0x20, 0xdf, 0x3d, 0x48, 0x58, 0xf6, 0xb1,
+);
+=cut
+
+Readonly my @INITIAL_WORD => ( 0x19, 0x3d, 0xe3, 0xbe );
+Readonly my @SUBBED_WORD  => ( 0xd4, 0x27, 0x11, 0xae );
+Readonly my @ROTTED_WORD  => ( 0x3d, 0xe3, 0xbe, 0x19 );
+
+subtest "SubWord" => sub {
+    my $initial_word  = pack( "C4", @INITIAL_WORD );
+    my $expected_word = pack( "C4", @SUBBED_WORD );
+
+    my $subbed_word;
+    lives_ok {
+        $subbed_word = Crypt::Rijndael::PP->_SubWord( $initial_word );
+    } "Lives through SubWord";
+
+    note("Initial Word:  " . unpack( "H8", $initial_word ) );
+    note("Expected Word: " . unpack( "H8", $expected_word ) );
+    note("Subbed Word:   " . unpack( "H8", $subbed_word ) );
+
+    for( my $byte_index = 0; $byte_index < 4; $byte_index++ ) {
+        my $subbed_byte   = unpack( "x" . $byte_index . "H2", $subbed_word );
+        my $expected_byte = unpack( "x" . $byte_index . "H2", $expected_word );
+
+        cmp_ok( $subbed_byte, 'eq', $expected_byte, "Correct SubWord Byte ($subbed_byte) at byte_index $byte_index" );
+    }
+};
+
+subtest "RotWord" => sub {
+    my $initial_word  = pack( "C4", @INITIAL_WORD );
+    my $expected_word = pack( "C4", @ROTTED_WORD );
+
+    my $rotted_word;
+    lives_ok {
+        $rotted_word = Crypt::Rijndael::PP->_RotWord( $initial_word );
+    } "Lives through RotWord";
+
+    note("Initial Word:  " . unpack( "H8", $initial_word ) );
+    note("Expected Word: " . unpack( "H8", $expected_word ) );
+    note("Rotted Word:   " . unpack( "H8", $rotted_word ) );
+
+    for( my $byte_index = 0; $byte_index < 4; $byte_index++ ) {
+        my $rotted_byte   = unpack( "x" . $byte_index . "H2", $rotted_word );
+        my $expected_byte = unpack( "x" . $byte_index . "H2", $expected_word );
+
+        cmp_ok( $rotted_byte, 'eq', $expected_byte, "Correct RotWord Byte ($rotted_byte) at byte_index $byte_index" );
+    }
+};
+
+subtest "128 Bit Key Expansion" => sub {
+    my $key = pack( "C16", @KEY_128_BIT );
+    my $expected_expanded_key = pack( "C176", @EXPANDED_KEY_128_BIT );
+
+    my $expanded_key;
+    lives_ok {
+        $expanded_key = Crypt::Rijndael::PP->_ExpandKey( $key );
+    } "Lives through KeyExpansion";
+
+    note("Initial Key :          " . unpack( "H32", $key ) );
+    note("Expected Expanded Key: " . unpack( "H352", $expected_expanded_key ) );
+    note("Expanded Key         : " . unpack( "H352", $expanded_key ) );
+
+    for( my $byte_index = 0; $byte_index < 176; $byte_index++ ) {
+        my $expanded_key_byte          = unpack( "x" . $byte_index . "H2", $expanded_key );
+        my $expected_expanded_key_byte = unpack( "x" . $byte_index . "H2", $expected_expanded_key );
+
+        cmp_ok( $expanded_key_byte, 'eq', $expected_expanded_key_byte,
+            "Correct KeyExpansion Byte ($expanded_key_byte) at byte_index $byte_index" );
+    }
+};
+
+done_testing;
