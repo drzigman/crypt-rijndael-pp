@@ -398,27 +398,40 @@ sub _ExpandKey {
 
     my $expanded_key = $key;
 
-    for( my $expansion_round = 1; $expansion_round < 11; $expansion_round++ ) {
+    for( my $expansion_round = 4; $expansion_round < 44; $expansion_round++ ) {
         ### Expansion Round: ( $expansion_round )
 
-        my $temp = substr( $expanded_key, ($expansion_round ) * 12, 4 );
+        my $temp = substr( $expanded_key, ($expansion_round * 4) - 4, 4 );
         ### Temp         : ( unpack("B*", $temp ) . " - " . unpack("H*", $temp ) )
 
-        my $rotted_word = $self->_RotWord( $temp );
-        ### Rotted Word  : ( unpack("B*", $rotted_word ) . " - " . unpack("H*", $rotted_word ) )
+        if( $expansion_round % 4 == 0 ) {
+            ### Performing Transformation...
 
-        my $subbed_word = $self->_SubWord( $rotted_word );
-        ### Subbed Word  : ( unpack("B*", $subbed_word ) . " - " . unpack("H*", $subbed_word ) )
+            my $rotted_word = $self->_RotWord( $temp );
+            ### Rotted Word  : ( unpack("B*", $rotted_word ) . " - " . unpack("H*", $rotted_word ) )
 
-        my $int_subbed_word = unpack( "N1", $subbed_word );
-        my $xored_result = $int_subbed_word ^ $RCONST[$expansion_round];
-        ### Int Subbed Word : ( unpack("B*", pack( "N", $int_subbed_word ) ) . " - " . unpack("H*", pack( "N", $int_subbed_word ) ) )
-        ### RCON            : ( unpack("B*", pack( "N", $RCONST[$expansion_round] ) ) . " - " . unpack("H*", pack( "N", $RCONST[$expansion_round] ) ) )
-        ### Xored Result    : ( unpack("B*", pack( "N", $xored_result ) ) . " - " . unpack("H*", pack("N", $xored_result ) ) )
+            my $subbed_word = $self->_SubWord( $rotted_word );
+            ### Subbed Word  : ( unpack("B*", $subbed_word ) . " - " . unpack("H*", $subbed_word ) )
 
-        $expanded_key .= $xored_result;
+            my $int_subbed_word = unpack( "N1", $subbed_word );
+            $temp = $int_subbed_word ^ $RCONST[$expansion_round / 4];
+            ### Int Subbed Word : ( unpack("B*", pack( "N", $int_subbed_word ) ) . " - " . unpack("H*", pack( "N", $int_subbed_word ) ) )
+            ### RCON            : ( unpack("B*", pack( "N", $RCONST[$expansion_round] ) ) . " - " . unpack("H*", pack( "N", $RCONST[$expansion_round] ) ) )
+            ### Xored Result    : ( unpack("B*", pack( "N", $temp ) ) . " - " . unpack("H*", pack("N", $temp ) ) )
+
+            $temp = pack("N1", $temp );
+            ### Temp : ( unpack("B*", $temp ) . " - " . unpack("H*", $temp ) )
+        }
+
+        my $previous_word     = substr( $expanded_key, ($expansion_round * 4) - 16, 4 );
+        my $int_previous_word = unpack( "N1", $previous_word );
+        my $new_word          = $int_previous_word ^ unpack("N1", $temp);
+        ### Previous Word     : ( unpack("B*", $previous_word) . " - " . unpack("H*", $previous_word ) )
+        ### Int Previous Word : ( unpack("B*", pack("N", $int_previous_word)) . " - " . unpack("H*", pack("N", $int_previous_word ) ) )
+        ### New Word          : ( unpack("B*", pack("N", $new_word ) ) . " - " . unpack("H*", pack("N", $new_word ) ) )
+
+        $expanded_key .= pack("N1", $new_word);
         ### Expanded Key : ( unpack("H*", $expanded_key ) )
-die;
     }
 
     return $expanded_key;
