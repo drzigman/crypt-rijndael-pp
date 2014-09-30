@@ -387,8 +387,48 @@ sub _generate_formatted_expression {
 }
 
 sub _AddRoundKey {
+    my $self         = shift;
+    my $state        = shift;
+    my $key_schedule = shift;
+    my $round        = shift;
 
+    my $relevant_key_schedule = substr( $key_schedule, ($round * 16), 16 );
+    ### Full Key Schedule : ( unpack("H*", $key_schedule ) )
+    ### Relevant Portion of Key Schedule : ( unpack("H*", $relevant_key_schedule ) )
+
+    for( my $column = 0; $column < 4; $column++ ) {
+        ### Processing Column : ( $column )
+
+        my $key_word     = substr( $relevant_key_schedule, ($column * 4 ), 4 );
+        my $state_column = pack( "C4", (
+            unpack( "C", $state->[0][$column] ),
+            unpack( "C", $state->[1][$column] ),
+            unpack( "C", $state->[2][$column] ),
+            unpack( "C", $state->[3][$column] ),
+        ) );
+        ### Key Word     : ( unpack("B*", $key_word ) . " - " . unpack("H*", $key_word ) )
+        ### State Column : ( unpack("B*", $state_column ) . " - " . unpack("H*", $state_column ) )
+
+        my $int_key_word     = unpack( "N1", $key_word );
+        my $int_state_column = unpack( "N1", $state_column );
+        my $xored_column     = $int_key_word ^ $int_state_column;
+        ### Int Key Word     : ( unpack("B*", pack( "N", $int_key_word ) ) . " - " . unpack("H*", pack( "N", $int_key_word ) ) )
+        ### Int State Column : ( unpack("B*", pack( "N", $int_state_column ) ) . " - " . unpack("H*", pack( "N", $int_state_column ) ) )
+        ### XOR'ed Column    : ( unpack("B*", pack( "N", $xored_column ) ) . " - " . unpack("H*", pack( "N", $xored_column ) ) )
+
+        $state->[0][$column] = pack("C", unpack( "x0C", pack( "N1", $xored_column ) ) );
+        $state->[1][$column] = pack("C", unpack( "x1C", pack( "N1", $xored_column ) ) );
+        $state->[2][$column] = pack("C", unpack( "x2C", pack( "N1", $xored_column ) ) );
+        $state->[3][$column] = pack("C", unpack( "x3C", pack( "N1", $xored_column ) ) );
+        ### Value of State Row 0 : ( unpack("H*", $state->[0][$column] ) )
+        ### Value of State Row 1 : ( unpack("H*", $state->[1][$column] ) )
+        ### Value of State Row 2 : ( unpack("H*", $state->[2][$column] ) )
+        ### Value of State Row 3 : ( unpack("H*", $state->[3][$column] ) )
+    }
+
+    return $state;
 }
+
 
 sub _ExpandKey {
     my $self = shift;
