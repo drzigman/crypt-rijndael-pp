@@ -55,29 +55,53 @@ Readonly my @RCONST => (
 
 Readonly my $IRREDUCIBLE_POLYNOMIAL => pack("B*", "0000000100011011" );
 
-=cut
+
 sub encrypt_block {
-    my $state = shift;
+    my $self  = shift;
+    my $input = shift;
     my $key   = shift;
 
-    my $num_rounds = 0;
+    my $num_rounds = 10;
 
-    AddRoundKey($state);
+    my $state        = $self->_input_to_state( $input );
+    ### Inital State: ( $self->_generate_printable_state( $state ) )
+
+    my $key_schedule = $self->_ExpandKey( $key );
+    ### Key Schedule: ( unpack("H*", $key_schedule ) )
+
+    $self->_AddRoundKey($state, $key_schedule, 0);
+    ### State After Round 0 AddRoundKey: ( $self->_generate_printable_state( $state ) )
 
     for( my $round = 1; $round < $num_rounds; $round++ ) {
-        SubBytes( $state );
-        ShiftRows( $state );
-        MixColumns( $tate );
-        AddRoundKey( $state, );
+        ### Processing Round Number: ( $round )
+
+        $self->_SubBytes( $state );
+        ### State after SubBytes: ( $self->_generate_printable_state( $state ) )
+
+        $self->_ShiftRows( $state );
+        ### State after ShiftRows: ( $self->_generate_printable_state( $state ) )
+
+        $self->_MixColumns( $state );
+        ### State after MixColumns: ( $self->_generate_printable_state( $state ) )
+
+        $self->_AddRoundKey( $state, $key_schedule, $round );
+        ### State after AddRoundKey: ( $self->_generate_printable_state( $state ) )
     }
 
-    SubBytes( $state );
-    ShiftRows( $state );
-    AddRoundKey( $state, );
+    ### Performing final transforms...
 
-    return $state;
+    $self->_SubBytes( $state );
+    ### State after SubBytes: ( $self->_generate_printable_state( $state ) )
+
+    $self->_ShiftRows( $state );
+    ### State after ShiftRows: ( $self->_generate_printable_state( $state ) )
+
+    $self->_AddRoundKey( $state, $key_schedule, $num_rounds );
+    ### State after AddRoundKey: ( $self->_generate_printable_state( $state ) )
+
+    return $self->_state_to_output( $state );
 }
-=cut
+
 
 sub _SubBytes {
     my $self  = shift;
@@ -95,12 +119,12 @@ sub _SubBytes {
                 ( hex($y) * 16 ) + hex($x)
             ]);
 
-            ### Row Index        : ( $row_index )
-            ### Column Index     : ( $column_index )
-            ### X Coordinate     : ( $x )
-            ### Y Coordinate     : ( $y )
-            ### Original Byte    : ( unpack "H2", $original_byte )
-            ### Substituted Byte : ( unpack "H2", $substituted_byte )
+            #### Row Index        : ( $row_index )
+            #### Column Index     : ( $column_index )
+            #### X Coordinate     : ( $x )
+            #### Y Coordinate     : ( $y )
+            #### Original Byte    : ( unpack "H2", $original_byte )
+            #### Substituted Byte : ( unpack "H2", $substituted_byte )
 
             $state->[$row_index][$column_index] = $substituted_byte;
         }
@@ -169,7 +193,7 @@ sub _mix_column {
         ^ pack( "C", unpack( "n", $s2 ) )
         ^ pack( "C", unpack( "n", $s3 ) );
 
-    ### S0 => S0_Prime : ( unpack( "H2", $s0 ) . " => " . unpack( "H2", $s0_prime ) )
+    #### S0 => S0_Prime : ( unpack( "H2", $s0 ) . " => " . unpack( "H2", $s0_prime ) )
 
     my $s1_prime =
           pack( "C", unpack( "n", $s0 ) )
@@ -177,7 +201,7 @@ sub _mix_column {
         ^ $self->_gf_multiplication( pack( "n", 0x03 ), $s2 )
         ^ pack( "C", unpack( "n", $s3 ) );
 
-    ### S1 => S1_Prime : ( unpack( "H2", $s1 ) . " => " . unpack( "H2", $s1_prime ) )
+    #### S1 => S1_Prime : ( unpack( "H2", $s1 ) . " => " . unpack( "H2", $s1_prime ) )
 
     my $s2_prime =
           pack( "C", unpack( "n", $s0 ) )
@@ -185,7 +209,7 @@ sub _mix_column {
         ^ $self->_gf_multiplication( pack( "n", 0x02 ), $s2 )
         ^ $self->_gf_multiplication( pack( "n", 0x03 ), $s3 );
 
-    ### S2 => S2_Prime : ( unpack( "H2", $s2 ) . " => " . unpack( "H2", $s2_prime ) )
+    #### S2 => S2_Prime : ( unpack( "H2", $s2 ) . " => " . unpack( "H2", $s2_prime ) )
 
     my $s3_prime =
           $self->_gf_multiplication( pack( "n", 0x03 ), $s0 )
@@ -193,7 +217,7 @@ sub _mix_column {
         ^ pack( "C", unpack( "n", $s2 ) )
         ^ $self->_gf_multiplication( pack( "n", 0x02 ), $s3 );
 
-    ### S3 => S3_Prime : ( unpack( "H2", $s3 ) . " => " . unpack( "H2", $s3_prime ) )
+    #### S3 => S3_Prime : ( unpack( "H2", $s3 ) . " => " . unpack( "H2", $s3_prime ) )
 
     return [ $s0_prime, $s1_prime, $s2_prime, $s3_prime ];
 }
@@ -209,12 +233,12 @@ sub _gf_multiplication {
     my $right_factor_bits          = unpack( "B16", $right_factor );
     my $reversed_right_factor_bits = reverse $right_factor_bits;
 
-    ### Left Factor Bits           : ( $left_factor_bits )
-    ### Reversed Left Factor Bits  : ( $reversed_left_factor_bits )
-    ### Left Factor Expression     : ( $self->_generate_formatted_expression( $left_factor_bits ) )
-    ### Right Factor Bits          : ( $right_factor_bits )
-    ### Reversed Right Factor Bits : ( $reversed_right_factor_bits )
-    ### Right Factor Expression    : ( $self->_generate_formatted_expression( $right_factor_bits ) )
+    #### Left Factor Bits           : ( $left_factor_bits )
+    #### Reversed Left Factor Bits  : ( $reversed_left_factor_bits )
+    #### Left Factor Expression     : ( $self->_generate_formatted_expression( $left_factor_bits ) )
+    #### Right Factor Bits          : ( $right_factor_bits )
+    #### Reversed Right Factor Bits : ( $reversed_right_factor_bits )
+    #### Right Factor Expression    : ( $self->_generate_formatted_expression( $right_factor_bits ) )
 
     my @resultant_terms;
     for( my $left_factor_bit_index = 0;
@@ -246,8 +270,8 @@ sub _gf_multiplication {
 
     }
 
-    ### Raw Resultant Terms      : ( map { $_ } sort @resultant_terms )
-    ### Formatted Resultant Terms: ( map { $self->_generate_formatted_expression( $_ ) } sort @resultant_terms )
+    #### Raw Resultant Terms      : ( map { $_ } sort @resultant_terms )
+    #### Formatted Resultant Terms: ( map { $self->_generate_formatted_expression( $_ ) } sort @resultant_terms )
 
     # Simply the expression
     my %orders = ();
@@ -268,26 +292,26 @@ sub _gf_multiplication {
         push @simplified_terms, $term;
     }
 
-    ### Raw Simplified Terms       : ( map { $_ } sort @simplified_terms )
-    ### Formatted Simplified Terms : ( map { $self->_generate_formatted_expression( $_ ) } sort @simplified_terms )
+    #### Raw Simplified Terms       : ( map { $_ } sort @simplified_terms )
+    #### Formatted Simplified Terms : ( map { $self->_generate_formatted_expression( $_ ) } sort @simplified_terms )
 
     my $resultant_expression = pack( "B16", "0" x 14 );
     for my $simplified_term ( @simplified_terms ) {
         my $binary_term       = pack( "B16", $simplified_term );
         $resultant_expression = $resultant_expression ^ $binary_term;
 
-        ### Binary Term          : ( unpack( "B16", $binary_term ) )
-        ### Resultant Expression : ( unpack( "B16", $resultant_expression ) )
+        #### Binary Term          : ( unpack( "B16", $binary_term ) )
+        #### Resultant Expression : ( unpack( "B16", $resultant_expression ) )
     }
 
-    ### Raw Resultant Expression       : ( unpack( "B*", $resultant_expression ) )
-    ### Formatted Resultant Expression : ( $self->_generate_formatted_expression( unpack( "B*", $resultant_expression ) ) )
+    #### Raw Resultant Expression       : ( unpack( "B*", $resultant_expression ) )
+    #### Formatted Resultant Expression : ( $self->_generate_formatted_expression( unpack( "B*", $resultant_expression ) ) )
 
     # Mod the result
     my $resultant_bits = $self->_pmod( $resultant_expression, $IRREDUCIBLE_POLYNOMIAL );
 
-    ### Raw Resultant Bits       : ( unpack( "B*", $resultant_bits ) )
-    ### Formatted Resultant Bits : ( $self->_generate_formatted_expression( unpack( "B*", $resultant_bits ) ) )
+    #### Raw Resultant Bits       : ( unpack( "B*", $resultant_bits ) )
+    #### Formatted Resultant Bits : ( $self->_generate_formatted_expression( unpack( "B*", $resultant_bits ) ) )
 
     return $resultant_bits;
 }
@@ -300,8 +324,8 @@ sub _p_order_compare {
     my $left_arg  = shift;
     my $right_arg = shift;
 
-    ### Left Argument  : ( $left_arg )
-    ### Right Argument : ( $right_arg )
+    #### Left Argument  : ( $left_arg )
+    #### Right Argument : ( $right_arg )
 
     my $position_of_msb_in_left_arg  = 16 - index( $left_arg,  "1" );
     my $position_of_msb_in_right_arg = 16 - index( $right_arg, "1" );
@@ -323,7 +347,7 @@ sub _pmod {
     my $dividend = shift;
     my $divisor  = shift;
 
-    ### Solving  : ( unpack("B*", $dividend ) . " mod " . unpack("B*", $divisor ) )
+    #### Solving  : ( unpack("B*", $dividend ) . " mod " . unpack("B*", $divisor ) )
 
     my $int_dividend = unpack("n", $dividend );
     my $int_divisor  = unpack("n", $divisor );
@@ -331,40 +355,41 @@ sub _pmod {
     my $long_division_result = $int_dividend;
     my $aligned_divisor      = $int_divisor;
 
-    ### Initial Dividend : ( $long_division_result )
-    ### Initial Divisor  : ( $int_divisor )
+    #### Initial Dividend : ( $long_division_result )
+    #### Initial Divisor  : ( $int_divisor )
 
     while( $self->_p_order_compare(
         unpack( "B16", pack( "n", $long_division_result) ),
         unpack( "B16", pack( "n", $int_divisor ) ),
         ) >= 0 ) {
-        ### Dividend : ( unpack("B*", pack("n", $long_division_result ) ) )
-        ### Divisor  : ( unpack("B*", pack("n", $int_divisor ) ) )
+        #### Dividend : ( unpack("B*", pack("n", $long_division_result ) ) )
+        #### Divisor  : ( unpack("B*", pack("n", $int_divisor ) ) )
 
         my $position_of_msb_in_dividend = 16 - index( unpack( "B*", pack("n", $long_division_result ) ), "1" );
         my $position_of_msb_in_divisor  = 16 - index( unpack( "B*", pack("n", $int_divisor ) ), "1" );
         my $num_shifts = $position_of_msb_in_dividend - $position_of_msb_in_divisor;
 
-        ### Position of MSB in Dividend: ( $position_of_msb_in_dividend )
-        ### Position of MSB in Divisor:  ( $position_of_msb_in_divisor )
-        ### Num Shifts: ( $num_shifts )
+        #### Position of MSB in Dividend: ( $position_of_msb_in_dividend )
+        #### Position of MSB in Divisor:  ( $position_of_msb_in_divisor )
+        #### Num Shifts: ( $num_shifts )
 
         $aligned_divisor = $int_divisor << $num_shifts;
 
-        ### Aligned Divisor : ( unpack("B*", pack("n", $aligned_divisor ) ) )
+        #### Aligned Divisor : ( unpack("B*", pack("n", $aligned_divisor ) ) )
 
         $long_division_result ^= $aligned_divisor;
 
-        ### Remaining : ( unpack("B*", pack("n", $long_division_result ) ) )
-        ### Formated Remaining : ( $self->_generate_formatted_expression( unpack("B*", pack("n", $long_division_result ) ) ) )
+        #### Remaining : ( unpack("B*", pack("n", $long_division_result ) ) )
+        #### Formated Remaining : ( $self->_generate_formatted_expression( unpack("B*", pack("n", $long_division_result ) ) ) )
     }
 
     my $modulus = pack("C", $long_division_result );
 
-    ### Resulting Modulus: ( unpack("H*", $modulus ) )
+    #### Resulting Modulus: ( unpack("H*", $modulus ) )
     return $modulus;
 }
 
+## no critic (Subroutines::ProhibitUnusedPrivateSubroutines)
 sub _generate_formatted_expression {
     my $self       = shift;
     my $expression = shift;
@@ -385,6 +410,7 @@ sub _generate_formatted_expression {
     chop $formatted_expression; # Remove the trailing space
     return $formatted_expression;
 }
+## use critic
 
 sub _AddRoundKey {
     my $self         = shift;
@@ -393,11 +419,11 @@ sub _AddRoundKey {
     my $round        = shift;
 
     my $relevant_key_schedule = substr( $key_schedule, ($round * 16), 16 );
-    ### Full Key Schedule : ( unpack("H*", $key_schedule ) )
-    ### Relevant Portion of Key Schedule : ( unpack("H*", $relevant_key_schedule ) )
+    #### Full Key Schedule : ( unpack("H*", $key_schedule ) )
+    #### Relevant Portion of Key Schedule : ( unpack("H*", $relevant_key_schedule ) )
 
     for( my $column = 0; $column < 4; $column++ ) {
-        ### Processing Column : ( $column )
+        #### Processing Column : ( $column )
 
         my $key_word     = substr( $relevant_key_schedule, ($column * 4 ), 4 );
         my $state_column = pack( "C4", (
@@ -406,24 +432,24 @@ sub _AddRoundKey {
             unpack( "C", $state->[2][$column] ),
             unpack( "C", $state->[3][$column] ),
         ) );
-        ### Key Word     : ( unpack("B*", $key_word ) . " - " . unpack("H*", $key_word ) )
-        ### State Column : ( unpack("B*", $state_column ) . " - " . unpack("H*", $state_column ) )
+        #### Key Word     : ( unpack("B*", $key_word ) . " - " . unpack("H*", $key_word ) )
+        #### State Column : ( unpack("B*", $state_column ) . " - " . unpack("H*", $state_column ) )
 
         my $int_key_word     = unpack( "N1", $key_word );
         my $int_state_column = unpack( "N1", $state_column );
         my $xored_column     = $int_key_word ^ $int_state_column;
-        ### Int Key Word     : ( unpack("B*", pack( "N", $int_key_word ) ) . " - " . unpack("H*", pack( "N", $int_key_word ) ) )
-        ### Int State Column : ( unpack("B*", pack( "N", $int_state_column ) ) . " - " . unpack("H*", pack( "N", $int_state_column ) ) )
-        ### XOR'ed Column    : ( unpack("B*", pack( "N", $xored_column ) ) . " - " . unpack("H*", pack( "N", $xored_column ) ) )
+        #### Int Key Word     : ( unpack("B*", pack( "N", $int_key_word ) ) . " - " . unpack("H*", pack( "N", $int_key_word ) ) )
+        #### Int State Column : ( unpack("B*", pack( "N", $int_state_column ) ) . " - " . unpack("H*", pack( "N", $int_state_column ) ) )
+        #### XOR'ed Column    : ( unpack("B*", pack( "N", $xored_column ) ) . " - " . unpack("H*", pack( "N", $xored_column ) ) )
 
         $state->[0][$column] = pack("C", unpack( "x0C", pack( "N1", $xored_column ) ) );
         $state->[1][$column] = pack("C", unpack( "x1C", pack( "N1", $xored_column ) ) );
         $state->[2][$column] = pack("C", unpack( "x2C", pack( "N1", $xored_column ) ) );
         $state->[3][$column] = pack("C", unpack( "x3C", pack( "N1", $xored_column ) ) );
-        ### Value of State Row 0 : ( unpack("H*", $state->[0][$column] ) )
-        ### Value of State Row 1 : ( unpack("H*", $state->[1][$column] ) )
-        ### Value of State Row 2 : ( unpack("H*", $state->[2][$column] ) )
-        ### Value of State Row 3 : ( unpack("H*", $state->[3][$column] ) )
+        #### Value of State Row 0 : ( unpack("H*", $state->[0][$column] ) )
+        #### Value of State Row 1 : ( unpack("H*", $state->[1][$column] ) )
+        #### Value of State Row 2 : ( unpack("H*", $state->[2][$column] ) )
+        #### Value of State Row 3 : ( unpack("H*", $state->[3][$column] ) )
     }
 
     return $state;
@@ -434,44 +460,44 @@ sub _ExpandKey {
     my $self = shift;
     my $key  = shift;
 
-    ### Initial Key: ( unpack("H*", $key ) )
+    #### Initial Key: ( unpack("H*", $key ) )
 
     my $expanded_key = $key;
 
     for( my $expansion_round = 4; $expansion_round < 44; $expansion_round++ ) {
-        ### Expansion Round: ( $expansion_round )
+        #### Expansion Round: ( $expansion_round )
 
         my $temp = substr( $expanded_key, ($expansion_round * 4) - 4, 4 );
-        ### Temp         : ( unpack("B*", $temp ) . " - " . unpack("H*", $temp ) )
+        #### Temp         : ( unpack("B*", $temp ) . " - " . unpack("H*", $temp ) )
 
         if( $expansion_round % 4 == 0 ) {
-            ### Performing Transformation...
+            #### Performing Transformation...
 
             my $rotted_word = $self->_RotWord( $temp );
-            ### Rotted Word  : ( unpack("B*", $rotted_word ) . " - " . unpack("H*", $rotted_word ) )
+            #### Rotted Word  : ( unpack("B*", $rotted_word ) . " - " . unpack("H*", $rotted_word ) )
 
             my $subbed_word = $self->_SubWord( $rotted_word );
-            ### Subbed Word  : ( unpack("B*", $subbed_word ) . " - " . unpack("H*", $subbed_word ) )
+            #### Subbed Word  : ( unpack("B*", $subbed_word ) . " - " . unpack("H*", $subbed_word ) )
 
             my $int_subbed_word = unpack( "N1", $subbed_word );
             $temp = $int_subbed_word ^ $RCONST[$expansion_round / 4];
-            ### Int Subbed Word : ( unpack("B*", pack( "N", $int_subbed_word ) ) . " - " . unpack("H*", pack( "N", $int_subbed_word ) ) )
-            ### RCON            : ( unpack("B*", pack( "N", $RCONST[$expansion_round] ) ) . " - " . unpack("H*", pack( "N", $RCONST[$expansion_round] ) ) )
-            ### Xored Result    : ( unpack("B*", pack( "N", $temp ) ) . " - " . unpack("H*", pack("N", $temp ) ) )
+            #### Int Subbed Word : ( unpack("B*", pack( "N", $int_subbed_word ) ) . " - " . unpack("H*", pack( "N", $int_subbed_word ) ) )
+            #### RCON            : ( unpack("B*", pack( "N", $RCONST[$expansion_round] ) ) . " - " . unpack("H*", pack( "N", $RCONST[$expansion_round] ) ) )
+            #### Xored Result    : ( unpack("B*", pack( "N", $temp ) ) . " - " . unpack("H*", pack("N", $temp ) ) )
 
             $temp = pack("N1", $temp );
-            ### Temp : ( unpack("B*", $temp ) . " - " . unpack("H*", $temp ) )
+            #### Temp : ( unpack("B*", $temp ) . " - " . unpack("H*", $temp ) )
         }
 
         my $previous_word     = substr( $expanded_key, ($expansion_round * 4) - 16, 4 );
         my $int_previous_word = unpack( "N1", $previous_word );
         my $new_word          = $int_previous_word ^ unpack("N1", $temp);
-        ### Previous Word     : ( unpack("B*", $previous_word) . " - " . unpack("H*", $previous_word ) )
-        ### Int Previous Word : ( unpack("B*", pack("N", $int_previous_word)) . " - " . unpack("H*", pack("N", $int_previous_word ) ) )
-        ### New Word          : ( unpack("B*", pack("N", $new_word ) ) . " - " . unpack("H*", pack("N", $new_word ) ) )
+        #### Previous Word     : ( unpack("B*", $previous_word) . " - " . unpack("H*", $previous_word ) )
+        #### Int Previous Word : ( unpack("B*", pack("N", $int_previous_word)) . " - " . unpack("H*", pack("N", $int_previous_word ) ) )
+        #### New Word          : ( unpack("B*", pack("N", $new_word ) ) . " - " . unpack("H*", pack("N", $new_word ) ) )
 
         $expanded_key .= pack("N1", $new_word);
-        ### Expanded Key : ( unpack("H*", $expanded_key ) )
+        #### Expanded Key : ( unpack("H*", $expanded_key ) )
     }
 
     return $expanded_key;
@@ -493,11 +519,11 @@ sub _SubWord {
             hex($y) + ( 16 * hex($x) )
         ]);
 
-        ### Byte Index       : ( $byte_index )
-        ### X Coordinate     : ( $x )
-        ### Y Coordinate     : ( $y )
-        ### Original Byte    : ( unpack "H2", $original_byte )
-        ### Substituted Byte : ( unpack "H2", $substituted_byte )
+        #### Byte Index       : ( $byte_index )
+        #### X Coordinate     : ( $x )
+        #### Y Coordinate     : ( $y )
+        #### Original Byte    : ( unpack "H2", $original_byte )
+        #### Substituted Byte : ( unpack "H2", $substituted_byte )
 
         $subbed_word .= $substituted_byte;
     }
@@ -523,7 +549,7 @@ sub _input_to_state {
     my $self  = shift;
     my $input = shift;
 
-    ### Length of Input: ( length $input )
+    #### Length of Input: ( length $input )
 
     if( length $input != 16 ) {
         croak "Invalid Input Length, Must be 128 Bits";
@@ -536,11 +562,11 @@ sub _input_to_state {
         for( my $row_index = 0; $row_index < 4; $row_index++ ) {
             my $byte = unpack("x" . ( $byte_index++ ) . "a", $input );
 
-            ### Row Index    : ( $row_index )
-            ### Column Index : ( $column_index )
-            ### Byte Index   : ( $byte_index )
-            ### Raw Byte     : ( $byte )
-            ### Byte         : ( unpack "H2", $byte )
+            #### Row Index    : ( $row_index )
+            #### Column Index : ( $column_index )
+            #### Byte Index   : ( $byte_index )
+            #### Raw Byte     : ( $byte )
+            #### Byte         : ( unpack "H2", $byte )
 
             $state->[$row_index][$column_index] = $byte;
         }
@@ -549,11 +575,26 @@ sub _input_to_state {
     return $state;
 }
 
+sub _state_to_output {
+    my $self  = shift;
+    my $state = shift;
+
+    my $output = "";
+
+    for( my $column_index = 0; $column_index < 4; $column_index++ ) {
+        for( my $row_index = 0; $row_index < 4; $row_index++ ) {
+            $output .= $state->[$row_index][$column_index];
+        }
+    }
+
+    return $output;
+}
+
+## no critic (Subroutines::ProhibitUnusedPrivateSubroutines)
 sub _print_formatted_state {
     my $self  = shift;
     my $state = shift;
 
-    my $byte_index = 0;
     for( my $row_index = 0; $row_index < 4; $row_index++ ) {
         for( my $column_index = 0; $column_index < 4; $column_index++ ) {
             my $state_byte = unpack("H2", $state->[$row_index][$column_index] );
@@ -564,5 +605,24 @@ sub _print_formatted_state {
 
     return;
 }
+## use critic
+
+## no critic (Subroutines::ProhibitUnusedPrivateSubroutines)
+sub _generate_printable_state {
+    my $self  = shift;
+    my $state = shift;
+
+    my $state_as_string = "";
+
+    for( my $row_index = 0; $row_index < 4; $row_index++ ) {
+        for( my $column_index = 0; $column_index < 4; $column_index++ ) {
+            my $state_byte = unpack("H2", $state->[$row_index][$column_index] );
+            $state_as_string .= $state_byte;
+        }
+    }
+
+    return $state_as_string;
+}
+## use critic
 
 1;
