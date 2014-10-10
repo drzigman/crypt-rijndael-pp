@@ -9,6 +9,8 @@ use Smart::Comments -ENV;
 use Data::Dumper;
 use Carp;
 
+use Crypt::Rijndael::PP::GF qw( gf_multiply );
+
 use Readonly;
 #<<< Don't Tidy S Box's
 Readonly my @SBOX => (
@@ -52,9 +54,6 @@ Readonly my @RCONST => (
     0x61, 0xc2, 0x9f, 0x25, 0x4a, 0x94, 0x33, 0x66, 0xcc, 0x83, 0x1d, 0x3a, 0x74, 0xe8, 0xcb, 0x8d
 );
 #>>>
-
-Readonly my $IRREDUCIBLE_POLYNOMIAL => pack("B*", "0000000100011011" );
-
 
 sub encrypt_block {
     my $self  = shift;
@@ -101,7 +100,6 @@ sub encrypt_block {
 
     return $self->_state_to_output( $state );
 }
-
 
 sub _SubBytes {
     my $self  = shift;
@@ -163,10 +161,10 @@ sub _MixColumns {
 
     for( my $column = 0; $column < 4; $column++ ) {
         my $mixed_column = $self->_mix_column([
-            pack("n", unpack( "C", $state->[0][$column] ) ),
-            pack("n", unpack( "C", $state->[1][$column] ) ),
-            pack("n", unpack( "C", $state->[2][$column] ) ),
-            pack("n", unpack( "C", $state->[3][$column] ) ),
+            unpack( "C", $state->[0][$column] ),
+            unpack( "C", $state->[1][$column] ),
+            unpack( "C", $state->[2][$column] ),
+            unpack( "C", $state->[3][$column] ),
         ]);
 
         $state->[0][$column] = $mixed_column->[0];
@@ -188,205 +186,38 @@ sub _mix_column {
     my $s3 = $column->[3];
 
     my $s0_prime =
-          $self->_gf_multiplication( pack( "n", 0x02 ), $s0 )
-        ^ $self->_gf_multiplication( pack( "n", 0x03 ), $s1 )
-        ^ pack( "C", unpack( "n", $s2 ) )
-        ^ pack( "C", unpack( "n", $s3 ) );
+          pack( "C", gf_multiply( 0x02, $s0 ) )
+        ^ pack( "C", gf_multiply( 0x03, $s1 ) )
+        ^ pack( "C", $s2 )
+        ^ pack( "C", $s3 );
 
     #### S0 => S0_Prime : ( unpack( "H2", $s0 ) . " => " . unpack( "H2", $s0_prime ) )
 
     my $s1_prime =
-          pack( "C", unpack( "n", $s0 ) )
-        ^ $self->_gf_multiplication( pack( "n", 0x02 ), $s1 )
-        ^ $self->_gf_multiplication( pack( "n", 0x03 ), $s2 )
-        ^ pack( "C", unpack( "n", $s3 ) );
+          pack( "C", $s0 )
+        ^ pack( "C", gf_multiply( 0x02, $s1 ) )
+        ^ pack( "C", gf_multiply( 0x03, $s2 ) )
+        ^ pack( "C", $s3 );
 
     #### S1 => S1_Prime : ( unpack( "H2", $s1 ) . " => " . unpack( "H2", $s1_prime ) )
 
     my $s2_prime =
-          pack( "C", unpack( "n", $s0 ) )
-        ^ pack( "C", unpack( "n", $s1 ) )
-        ^ $self->_gf_multiplication( pack( "n", 0x02 ), $s2 )
-        ^ $self->_gf_multiplication( pack( "n", 0x03 ), $s3 );
+          pack( "C", $s0 )
+        ^ pack( "C", $s1 )
+        ^ pack( "C", gf_multiply( 0x02, $s2 ) )
+        ^ pack( "C", gf_multiply( 0x03, $s3 ) );
 
     #### S2 => S2_Prime : ( unpack( "H2", $s2 ) . " => " . unpack( "H2", $s2_prime ) )
 
     my $s3_prime =
-          $self->_gf_multiplication( pack( "n", 0x03 ), $s0 )
-        ^ pack( "C", unpack( "n", $s1 ) )
-        ^ pack( "C", unpack( "n", $s2 ) )
-        ^ $self->_gf_multiplication( pack( "n", 0x02 ), $s3 );
+          pack( "C", gf_multiply( 0x03, $s0 ) )
+        ^ pack( "C", $s1 )
+        ^ pack( "C", $s2 )
+        ^ pack( "C", gf_multiply( 0x02, $s3 ) );
 
     #### S3 => S3_Prime : ( unpack( "H2", $s3 ) . " => " . unpack( "H2", $s3_prime ) )
 
     return [ $s0_prime, $s1_prime, $s2_prime, $s3_prime ];
-}
-
-sub _gf_multiplication {
-    my $self = shift;
-    my $left_factor  = shift;
-    my $right_factor = shift;
-
-    my $left_factor_bits          = unpack( "B16", $left_factor );
-    my $reversed_left_factor_bits = reverse $left_factor_bits;
-
-    my $right_factor_bits          = unpack( "B16", $right_factor );
-    my $reversed_right_factor_bits = reverse $right_factor_bits;
-
-    #### Left Factor Bits           : ( $left_factor_bits )
-    #### Reversed Left Factor Bits  : ( $reversed_left_factor_bits )
-    #### Left Factor Expression     : ( $self->_generate_formatted_expression( $left_factor_bits ) )
-    #### Right Factor Bits          : ( $right_factor_bits )
-    #### Reversed Right Factor Bits : ( $reversed_right_factor_bits )
-    #### Right Factor Expression    : ( $self->_generate_formatted_expression( $right_factor_bits ) )
-
-    my @resultant_terms;
-    for( my $left_factor_bit_index = 0;
-        $left_factor_bit_index < 16;
-        $left_factor_bit_index++ ) {
-
-        my $left_factor_bit = substr( $reversed_left_factor_bits, $left_factor_bit_index, 1 );
-
-        if( $left_factor_bit eq "0" ) {
-            next;
-        }
-
-        for( my $right_factor_bit_index = 0;
-            $right_factor_bit_index < 16;
-            $right_factor_bit_index++ ) {
-
-            my $right_factor_bit = substr( $reversed_right_factor_bits, $right_factor_bit_index, 1 );
-
-            if( $right_factor_bit eq "0" ) {
-                next;
-            }
-
-            my $result =
-                ("0" x (15 - ( $left_factor_bit_index + $right_factor_bit_index ) ) )
-                . "1" . ( "0" x ($left_factor_bit_index + $right_factor_bit_index) );
-
-            push @resultant_terms, $result;
-        }
-
-    }
-
-    #### Raw Resultant Terms      : ( map { $_ } sort @resultant_terms )
-    #### Formatted Resultant Terms: ( map { $self->_generate_formatted_expression( $_ ) } sort @resultant_terms )
-
-    # Simply the expression
-    my %orders = ();
-    for my $term ( @resultant_terms ) {
-        if( !exists $orders{$term} ) {
-            $orders{$term} = 0;
-        }
-
-        $orders{$term}++;
-    }
-
-    my @simplified_terms;
-    for my $term ( keys %orders ) {
-        if( $orders{$term} % 2 == 0 ) {
-            next;
-        }
-
-        push @simplified_terms, $term;
-    }
-
-    #### Raw Simplified Terms       : ( map { $_ } sort @simplified_terms )
-    #### Formatted Simplified Terms : ( map { $self->_generate_formatted_expression( $_ ) } sort @simplified_terms )
-
-    my $resultant_expression = pack( "B16", "0" x 14 );
-    for my $simplified_term ( @simplified_terms ) {
-        my $binary_term       = pack( "B16", $simplified_term );
-        $resultant_expression = $resultant_expression ^ $binary_term;
-
-        #### Binary Term          : ( unpack( "B16", $binary_term ) )
-        #### Resultant Expression : ( unpack( "B16", $resultant_expression ) )
-    }
-
-    #### Raw Resultant Expression       : ( unpack( "B*", $resultant_expression ) )
-    #### Formatted Resultant Expression : ( $self->_generate_formatted_expression( unpack( "B*", $resultant_expression ) ) )
-
-    # Mod the result
-    my $resultant_bits = $self->_pmod( $resultant_expression, $IRREDUCIBLE_POLYNOMIAL );
-
-    #### Raw Resultant Bits       : ( unpack( "B*", $resultant_bits ) )
-    #### Formatted Resultant Bits : ( $self->_generate_formatted_expression( unpack( "B*", $resultant_bits ) ) )
-
-    return $resultant_bits;
-}
-
-# left_arg <  $right_arg = -1
-# left_arg == $right_arg = 0
-# left_arg >  $right_arg = 1
-sub _p_order_compare {
-    my $self = shift;
-    my $left_arg  = shift;
-    my $right_arg = shift;
-
-    #### Left Argument  : ( $left_arg )
-    #### Right Argument : ( $right_arg )
-
-    my $position_of_msb_in_left_arg  = 16 - index( $left_arg,  "1" );
-    my $position_of_msb_in_right_arg = 16 - index( $right_arg, "1" );
-
-    if( $position_of_msb_in_left_arg < $position_of_msb_in_right_arg ) {
-        return -1;
-    }
-    elsif( $position_of_msb_in_left_arg > $position_of_msb_in_right_arg ) {
-        return 1;
-    }
-    else {
-        return 0;
-    }
-}
-
-sub _pmod {
-    my $self = shift;
-
-    my $dividend = shift;
-    my $divisor  = shift;
-
-    #### Solving  : ( unpack("B*", $dividend ) . " mod " . unpack("B*", $divisor ) )
-
-    my $int_dividend = unpack("n", $dividend );
-    my $int_divisor  = unpack("n", $divisor );
-
-    my $long_division_result = $int_dividend;
-    my $aligned_divisor      = $int_divisor;
-
-    #### Initial Dividend : ( $long_division_result )
-    #### Initial Divisor  : ( $int_divisor )
-
-    while( $self->_p_order_compare(
-        unpack( "B16", pack( "n", $long_division_result) ),
-        unpack( "B16", pack( "n", $int_divisor ) ),
-        ) >= 0 ) {
-        #### Dividend : ( unpack("B*", pack("n", $long_division_result ) ) )
-        #### Divisor  : ( unpack("B*", pack("n", $int_divisor ) ) )
-
-        my $position_of_msb_in_dividend = 16 - index( unpack( "B*", pack("n", $long_division_result ) ), "1" );
-        my $position_of_msb_in_divisor  = 16 - index( unpack( "B*", pack("n", $int_divisor ) ), "1" );
-        my $num_shifts = $position_of_msb_in_dividend - $position_of_msb_in_divisor;
-
-        #### Position of MSB in Dividend: ( $position_of_msb_in_dividend )
-        #### Position of MSB in Divisor:  ( $position_of_msb_in_divisor )
-        #### Num Shifts: ( $num_shifts )
-
-        $aligned_divisor = $int_divisor << $num_shifts;
-
-        #### Aligned Divisor : ( unpack("B*", pack("n", $aligned_divisor ) ) )
-
-        $long_division_result ^= $aligned_divisor;
-
-        #### Remaining : ( unpack("B*", pack("n", $long_division_result ) ) )
-        #### Formated Remaining : ( $self->_generate_formatted_expression( unpack("B*", pack("n", $long_division_result ) ) ) )
-    }
-
-    my $modulus = pack("C", $long_division_result );
-
-    #### Resulting Modulus: ( unpack("H*", $modulus ) )
-    return $modulus;
 }
 
 ## no critic (Subroutines::ProhibitUnusedPrivateSubroutines)
@@ -454,7 +285,6 @@ sub _AddRoundKey {
 
     return $state;
 }
-
 
 sub _ExpandKey {
     my $self = shift;
