@@ -111,12 +111,12 @@ sub _SubBytes {
         for( my $row_index = 0; $row_index < 4; $row_index++ ) {
             my $original_byte = $state->[$row_index][$column_index];
 
-            my $xy = unpack( "h2", $original_byte );
+            my $xy = unpack( "H2", $original_byte );
             my $x  = substr( $xy, 0, 1 );
             my $y  = substr( $xy, 1, 1 );
 
             my $substituted_byte = pack( "C", $SBOX[
-                ( hex($y) * 16 ) + hex($x)
+                ( hex($x) * 16 ) + hex($y)
             ]);
 
             #### Row Index        : ( $row_index )
@@ -516,7 +516,7 @@ sub _SubWord {
         my $y  = substr( $xy, 1, 1 );
 
         my $substituted_byte = pack( "C", $SBOX[
-            hex($y) + ( 16 * hex($x) )
+            ( 16 * hex($x) ) + hex($y)
         ]);
 
         #### Byte Index       : ( $byte_index )
