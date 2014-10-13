@@ -7,6 +7,7 @@ use Test::More;
 use Test::Exception;
 
 use Crypt::Rijndael::PP;
+use Crypt::Rijndael::PP::Debug qw( generate_printable_state );
 
 use Readonly;
 Readonly my @CIPHER_KEY => (
@@ -50,13 +51,13 @@ subtest "Round 0 AddRoundKey" => sub {
         $packed_input
     );
 
+    note("Original State:\n");
+    note( generate_printable_state( $state ) );
+
     my $packed_expected_ouput = pack( "C*", @ROUND_0_EXPECTED_OUTPUT );
     my $expected_state = Crypt::Rijndael::PP->_input_to_state(
         $packed_expected_ouput
     );
-
-    note("Original State:\n");
-    note( Crypt::Rijndael::PP->_print_formatted_state( $state ) );
 
     my $updated_state;
     lives_ok {
@@ -66,10 +67,10 @@ subtest "Round 0 AddRoundKey" => sub {
     } "Lives through AddRoundKey";
 
     note("Updated State:\n");
-    note( Crypt::Rijndael::PP->_print_formatted_state( $updated_state ) );
+    note( generate_printable_state( $updated_state ) );
 
     note("Expected State:\n");
-    note( Crypt::Rijndael::PP->_print_formatted_state( $expected_state ) );
+    note( generate_printable_state( $expected_state ) );
 
     my $byte_index = 0;
     for ( my $row_index = 0; $row_index < 4; $row_index++ ) {
@@ -95,13 +96,13 @@ subtest "Round 9 AddRoundKey" => sub {
         $packed_input
     );
 
+    note("Original State:\n");
+    note( generate_printable_state( $state ) );
+
     my $packed_expected_ouput = pack( "C*", @ROUND_9_EXPECTED_OUTPUT );
     my $expected_state = Crypt::Rijndael::PP->_input_to_state(
         $packed_expected_ouput
     );
-
-    note("Original State:\n");
-    note( Crypt::Rijndael::PP->_print_formatted_state( $state ) );
 
     my $updated_state;
     lives_ok {
@@ -111,10 +112,10 @@ subtest "Round 9 AddRoundKey" => sub {
     } "Lives through AddRoundKey";
 
     note("Updated State:\n");
-    note( Crypt::Rijndael::PP->_print_formatted_state( $updated_state ) );
+    note( generate_printable_state( $updated_state ) );
 
     note("Expected State:\n");
-    note( Crypt::Rijndael::PP->_print_formatted_state( $expected_state ) );
+    note( generate_printable_state( $expected_state ) );
 
     my $byte_index = 0;
     for ( my $row_index = 0; $row_index < 4; $row_index++ ) {

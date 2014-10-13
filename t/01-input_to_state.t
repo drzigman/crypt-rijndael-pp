@@ -8,6 +8,7 @@ use Test::More;
 use Test::Exception;
 
 use Crypt::Rijndael::PP;
+use Crypt::Rijndael::PP::Debug qw( generate_printable_state );
 
 use Readonly;
 Readonly my $STRING       => "ABCDEFGHIJKLMNOP";
@@ -24,7 +25,7 @@ subtest "Convert 128 Bit Input to State" => sub {
         return;
     }
 
-    note( Crypt::Rijndael::PP->_print_formatted_state( $state ) );
+    note( generate_printable_state( $state ) );
 
     for ( my $row_index = 0; $row_index < 4; $row_index++ ) {
         for ( my $column_index = 0; $column_index < 4; $column_index++ ) {

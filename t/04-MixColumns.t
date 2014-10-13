@@ -10,6 +10,7 @@ use Test::More;
 use Storable qw( dclone );
 
 use Crypt::Rijndael::PP;
+use Crypt::Rijndael::PP::Debug qw( generate_printable_state );
 
 use Readonly;
 Readonly my @INPUT => (
@@ -55,8 +56,7 @@ subtest "Perform Mix Columns on Input State" => sub {
     my $state = Crypt::Rijndael::PP->_input_to_state( $packed_input );
 
     note("Original State:\n");
-    note( Crypt::Rijndael::PP->_print_formatted_state( $state ) );
-
+    note( generate_printable_state( $state ) );
 
     my $packed_expected_output = pack( "C*", @EXPECTED_OUTPUT );
     my $expected_state = Crypt::Rijndael::PP->_input_to_state(
@@ -69,10 +69,10 @@ subtest "Perform Mix Columns on Input State" => sub {
     } "Lives through ShiftRows";
 
     note("Updated State:\n");
-    note( Crypt::Rijndael::PP->_print_formatted_state( $updated_state ) );
+    note( generate_printable_state( $updated_state ) );
 
     note("Expected State:\n");
-    note( Crypt::Rijndael::PP->_print_formatted_state( $expected_state ) );
+    note( generate_printable_state( $expected_state ) );
 
     my $byte_index = 0;
     for ( my $row_index = 0; $row_index < 4; $row_index++ ) {

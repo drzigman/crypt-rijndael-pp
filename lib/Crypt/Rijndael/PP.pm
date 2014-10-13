@@ -10,6 +10,7 @@ use Data::Dumper;
 use Carp;
 
 use Crypt::Rijndael::PP::GF qw( gf_multiply );
+use Crypt::Rijndael::PP::Debug qw( generate_printable_state );
 
 use Readonly;
 #<<< Don't Tidy S Box's
@@ -63,40 +64,40 @@ sub encrypt_block {
     my $num_rounds = 10;
 
     my $state        = $self->_input_to_state( $input );
-    ### Inital State: ( $self->_generate_printable_state( $state ) )
+    ### Inital State: ( generate_printable_state( $state ) )
 
     my $key_schedule = $self->_ExpandKey( $key );
     ### Key Schedule: ( unpack("H*", $key_schedule ) )
 
     $self->_AddRoundKey($state, $key_schedule, 0);
-    ### State After Round 0 AddRoundKey: ( $self->_generate_printable_state( $state ) )
+    ### State After Round 0 AddRoundKey: ( generate_printable_state( $state ) )
 
     for( my $round = 1; $round < $num_rounds; $round++ ) {
         ### Processing Round Number: ( $round )
 
         $self->_SubBytes( $state );
-        ### State after SubBytes: ( $self->_generate_printable_state( $state ) )
+        ### State after SubBytes: ( generate_printable_state( $state ) )
 
         $self->_ShiftRows( $state );
-        ### State after ShiftRows: ( $self->_generate_printable_state( $state ) )
+        ### State after ShiftRows: ( generate_printable_state( $state ) )
 
         $self->_MixColumns( $state );
-        ### State after MixColumns: ( $self->_generate_printable_state( $state ) )
+        ### State after MixColumns: ( generate_printable_state( $state ) )
 
         $self->_AddRoundKey( $state, $key_schedule, $round );
-        ### State after AddRoundKey: ( $self->_generate_printable_state( $state ) )
+        ### State after AddRoundKey: ( generate_printable_state( $state ) )
     }
 
     ### Performing final transforms...
 
     $self->_SubBytes( $state );
-    ### State after SubBytes: ( $self->_generate_printable_state( $state ) )
+    ### State after SubBytes: ( generate_printable_state( $state ) )
 
     $self->_ShiftRows( $state );
-    ### State after ShiftRows: ( $self->_generate_printable_state( $state ) )
+    ### State after ShiftRows: ( generate_printable_state( $state ) )
 
     $self->_AddRoundKey( $state, $key_schedule, $num_rounds );
-    ### State after AddRoundKey: ( $self->_generate_printable_state( $state ) )
+    ### State after AddRoundKey: ( generate_printable_state( $state ) )
 
     return $self->_state_to_output( $state );
 }
@@ -219,29 +220,6 @@ sub _mix_column {
 
     return [ $s0_prime, $s1_prime, $s2_prime, $s3_prime ];
 }
-
-## no critic (Subroutines::ProhibitUnusedPrivateSubroutines)
-sub _generate_formatted_expression {
-    my $self       = shift;
-    my $expression = shift;
-
-    my $reversed_expression  = reverse $expression;
-    my $formatted_expression = "";
-
-    for( my $bit_index = 0; $bit_index < length( $reversed_expression ); $bit_index++ ) {
-        my $bit = substr( $reversed_expression, $bit_index, 1 );
-
-        if( $bit eq '0' ) {
-            next;
-        }
-
-        $formatted_expression = "x^" . ( $bit_index ) . " " . $formatted_expression;
-    }
-
-    chop $formatted_expression; # Remove the trailing space
-    return $formatted_expression;
-}
-## use critic
 
 sub _AddRoundKey {
     my $self         = shift;
@@ -419,40 +397,5 @@ sub _state_to_output {
 
     return $output;
 }
-
-## no critic (Subroutines::ProhibitUnusedPrivateSubroutines)
-sub _print_formatted_state {
-    my $self  = shift;
-    my $state = shift;
-
-    for( my $row_index = 0; $row_index < 4; $row_index++ ) {
-        for( my $column_index = 0; $column_index < 4; $column_index++ ) {
-            my $state_byte = unpack("H2", $state->[$row_index][$column_index] );
-            print "0x" . $state_byte . "\t";
-        }
-        print "\n";
-    }
-
-    return;
-}
-## use critic
-
-## no critic (Subroutines::ProhibitUnusedPrivateSubroutines)
-sub _generate_printable_state {
-    my $self  = shift;
-    my $state = shift;
-
-    my $state_as_string = "";
-
-    for( my $row_index = 0; $row_index < 4; $row_index++ ) {
-        for( my $column_index = 0; $column_index < 4; $column_index++ ) {
-            my $state_byte = unpack("H2", $state->[$row_index][$column_index] );
-            $state_as_string .= $state_byte;
-        }
-    }
-
-    return $state_as_string;
-}
-## use critic
 
 1;
