@@ -56,6 +56,12 @@ Readonly my @RCONST => (
 );
 #>>>
 
+Readonly my $NUM_ROUNDS => {
+    128 => 10,
+    192 => 12,
+    256 => 14,
+};
+
 sub encrypt_block {
     my $self  = shift;
     my $input = shift;
@@ -272,13 +278,21 @@ sub _ExpandKey {
 
     my $expanded_key = $key;
 
-    for( my $expansion_round = 4; $expansion_round < 44; $expansion_round++ ) {
+    # Nb * (Nr + 1)
+    my $bits_in_initial_key = length( unpack("H*", $key ) ) * 4;
+    my $words_in_key        = $bits_in_initial_key / ( 8 * 4 );
+    my $number_of_rounds    = 4 * ( $NUM_ROUNDS->{ $bits_in_initial_key  } + 1);
+    #### Number of Bits in Initial Key : ( $bits_in_initial_key )
+    #### Words In Initial Key          : ( $words_in_key )
+    #### Number of Rounds              : ( $number_of_rounds )
+
+    for( my $expansion_round = $words_in_key; $expansion_round < $number_of_rounds; $expansion_round++ ) {
         #### Expansion Round: ( $expansion_round )
 
         my $temp = substr( $expanded_key, ($expansion_round * 4) - 4, 4 );
         #### Temp         : ( unpack("B*", $temp ) . " - " . unpack("H*", $temp ) )
 
-        if( $expansion_round % 4 == 0 ) {
+        if( $expansion_round % $words_in_key == 0 ) {
             #### Performing Transformation...
 
             my $rotted_word = $self->_RotWord( $temp );
@@ -288,16 +302,23 @@ sub _ExpandKey {
             #### Subbed Word  : ( unpack("B*", $subbed_word ) . " - " . unpack("H*", $subbed_word ) )
 
             my $int_subbed_word = unpack( "N1", $subbed_word );
-            $temp = $int_subbed_word ^ $RCONST[$expansion_round / 4];
+            $temp = $int_subbed_word ^ $RCONST[ $expansion_round / $words_in_key ];
             #### Int Subbed Word : ( unpack("B*", pack( "N", $int_subbed_word ) ) . " - " . unpack("H*", pack( "N", $int_subbed_word ) ) )
-            #### RCON            : ( unpack("B*", pack( "N", $RCONST[$expansion_round] ) ) . " - " . unpack("H*", pack( "N", $RCONST[$expansion_round] ) ) )
+            #### Index into RCON : ( $expansion_round / $words_in_key )
+            #### RCON            : ( unpack("B*", pack( "N", $RCONST[$expansion_round / $words_in_key] ) ) . " - " . unpack("H*", pack( "N", $RCONST[$expansion_round / $words_in_key] ) ) )
             #### Xored Result    : ( unpack("B*", pack( "N", $temp ) ) . " - " . unpack("H*", pack("N", $temp ) ) )
 
             $temp = pack("N1", $temp );
             #### Temp : ( unpack("B*", $temp ) . " - " . unpack("H*", $temp ) )
         }
+        elsif( $words_in_key > 6 && $expansion_round % $words_in_key == 4 ) {
+            #### Performing 256 Bit Transform...
 
-        my $previous_word     = substr( $expanded_key, ($expansion_round * 4) - 16, 4 );
+            $temp = $self->_SubWord( $temp );
+            #### Subbed Word  : ( unpack("B*", $temp ) . " - " . unpack("H*", $temp ) )
+        }
+
+        my $previous_word     = substr( $expanded_key, ($expansion_round * 4) - ( $words_in_key * 4 ), 4 );
         my $int_previous_word = unpack( "N1", $previous_word );
         my $new_word          = $int_previous_word ^ unpack("N1", $temp);
         #### Previous Word     : ( unpack("B*", $previous_word) . " - " . unpack("H*", $previous_word ) )
