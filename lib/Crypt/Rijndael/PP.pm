@@ -81,6 +81,34 @@ Readonly my $NUM_ROUNDS => {
     256 => 14,
 };
 
+sub blocksize {
+    return 16;
+}
+
+sub new {
+    my $class = shift;
+    my $key   = shift;
+
+    my $self = {
+        key => $key,
+    };
+
+    bless $self, $class;
+
+    return $self;
+}
+
+sub MODE_ECB {
+    return 1;
+}
+
+sub encrypt {
+    my $self  = shift;
+    my $input = shift;
+
+    return $self->encrypt_block( $input, $self->{key} );
+}
+
 sub encrypt_block {
     my $self  = shift;
     my $input = shift;
@@ -533,7 +561,8 @@ sub _input_to_state {
     my $self  = shift;
     my $input = shift;
 
-    #### Length of Input: ( length $input )
+    #### Input           : ( unpack( "H*", $input ) )
+    #### Length of Input : ( length $input )
 
     if( length $input != 16 ) {
         croak "Invalid Input Length, Must be 128 Bits";
