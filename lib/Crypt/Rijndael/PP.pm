@@ -132,6 +132,57 @@ sub encrypt_block {
     return $self->_state_to_output( $state );
 }
 
+sub decrypt_block {
+    my $self  = shift;
+    my $input = shift;
+    my $key   = shift;
+
+    my $bits_in_initial_key = length( unpack("H*", $key ) ) * 4;
+    my $words_in_key        = $bits_in_initial_key / ( 8 * 4 );
+    my $number_of_rounds    =  $NUM_ROUNDS->{ $bits_in_initial_key };
+    #### Number of Bits in Initial Key : ( $bits_in_initial_key )
+    #### Words In Initial Key          : ( $words_in_key )
+    #### Number of Rounds              : ( $number_of_rounds )
+
+    my $state        = $self->_input_to_state( $input );
+    ### Inital State: ( generate_printable_state( $state ) )
+
+    my $key_schedule = $self->_ExpandKey( $key );
+    ### Key Schedule: ( unpack("H*", $key_schedule ) )
+
+    $self->_AddRoundKey($state, $key_schedule, $number_of_rounds);
+    ### State After Round 0 AddRoundKey: ( generate_printable_state( $state ) )
+
+    for( my $round = $number_of_rounds - 1; $round > 0; $round-- ) {
+        ### Processing Round Number: ( $round )
+
+        $self->_InvShiftRows( $state );
+        ### State After InvShiftRows: ( generate_printable_state( $state ) )
+
+        $self->_InvSubBytes( $state );
+        ### State After InvSubBytes: ( generate_printable_state( $state ) )
+
+        $self->_AddRoundKey( $state, $key_schedule, $round );
+        ### State After AddRoundKey: ( generate_printable_state( $state ) )
+
+        $self->_InvMixColumns( $state );
+        ### State After InvMixColumns: ( generate_printable_state( $state ) )
+    }
+
+    ### Performing final transforms...
+
+    $self->_InvShiftRows( $state );
+    ### State After InvShiftRows: ( generate_printable_state( $state ) )
+
+    $self->_InvSubBytes( $state );
+    ### State After InvSubBytes: ( generate_printable_state( $state ) )
+
+    $self->_AddRoundKey( $state, $key_schedule, 0 );
+    ### State After AddRoundKey: ( generate_printable_state( $state ) )
+
+    return $self->_state_to_output( $state );
+}
+
 sub _SubBytes {
     my $self  = shift;
     my $state = shift;
