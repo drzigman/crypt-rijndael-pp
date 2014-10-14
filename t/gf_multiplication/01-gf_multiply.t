@@ -26,9 +26,9 @@ subtest "Attempt to gf_multiply a left_factor that has not been precomputed" => 
 };
 
 subtest "gf_multiply gives correct value" => sub {
-    for my $left_factor ( keys $GF_MULTIPLICATION_TEST_VALUES ) {
+    for my $left_factor ( keys %{ $GF_MULTIPLICATION_TEST_VALUES } ) {
         subtest "Left Factor - 0x" . unpack("x3H2", pack("N", $left_factor ) ) => sub {
-            for my $right_factor ( keys $GF_MULTIPLICATION_TEST_VALUES->{ $left_factor } ) {
+            for my $right_factor ( keys %{ $GF_MULTIPLICATION_TEST_VALUES->{ $left_factor } } ) {
 
                 my $product;
                 lives_ok {

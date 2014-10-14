@@ -156,7 +156,7 @@ sub _shift_row {
     my $num_bytes = shift;
 
     for( my $shift_round = 0; $shift_round < $num_bytes; $shift_round++ ) {
-        push ($row, shift $row);
+        push ( @{ $row }, shift @{ $row });
     }
 
     return $row;
