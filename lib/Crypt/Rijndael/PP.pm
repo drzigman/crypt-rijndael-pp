@@ -266,6 +266,71 @@ sub _mix_column {
     return [ $s0_prime, $s1_prime, $s2_prime, $s3_prime ];
 }
 
+sub _InvMixColumns {
+    my $self  = shift;
+    my $state = shift;
+
+    for( my $column = 0; $column < 4; $column++ ) {
+        my $mixed_column = $self->_inv_mix_column([
+            unpack( "C", $state->[0][$column] ),
+            unpack( "C", $state->[1][$column] ),
+            unpack( "C", $state->[2][$column] ),
+            unpack( "C", $state->[3][$column] ),
+        ]);
+
+        $state->[0][$column] = $mixed_column->[0];
+        $state->[1][$column] = $mixed_column->[1];
+        $state->[2][$column] = $mixed_column->[2];
+        $state->[3][$column] = $mixed_column->[3];
+    }
+
+    return $state;
+}
+
+sub _inv_mix_column {
+    my $self   = shift;
+    my $column = shift;
+
+    my $s0 = $column->[0];
+    my $s1 = $column->[1];
+    my $s2 = $column->[2];
+    my $s3 = $column->[3];
+
+    my $s0_prime =
+          pack( "C", gf_multiply( 0x0e, $s0 ) )
+        ^ pack( "C", gf_multiply( 0x0b, $s1 ) )
+        ^ pack( "C", gf_multiply( 0x0d, $s2 ) )
+        ^ pack( "C", gf_multiply( 0x09, $s3 ) );
+
+    #### S0 => S0_Prime : ( unpack( "H2", $s0 ) . " => " . unpack( "H2", $s0_prime ) )
+
+    my $s1_prime =
+          pack( "C", gf_multiply( 0x09, $s0 ) )
+        ^ pack( "C", gf_multiply( 0x0e, $s1 ) )
+        ^ pack( "C", gf_multiply( 0x0b, $s2 ) )
+        ^ pack( "C", gf_multiply( 0x0d, $s3 ) );
+
+    #### S1 => S1_Prime : ( unpack( "H2", $s1 ) . " => " . unpack( "H2", $s1_prime ) )
+
+    my $s2_prime =
+          pack( "C", gf_multiply( 0x0d, $s0 ) )
+        ^ pack( "C", gf_multiply( 0x09, $s1 ) )
+        ^ pack( "C", gf_multiply( 0x0e, $s2 ) )
+        ^ pack( "C", gf_multiply( 0x0b, $s3 ) );
+
+    #### S2 => S2_Prime : ( unpack( "H2", $s2 ) . " => " . unpack( "H2", $s2_prime ) )
+
+    my $s3_prime =
+          pack( "C", gf_multiply( 0x0b, $s0 ) )
+        ^ pack( "C", gf_multiply( 0x0d, $s1 ) )
+        ^ pack( "C", gf_multiply( 0x09, $s2 ) )
+        ^ pack( "C", gf_multiply( 0x0e, $s3 ) );
+
+    #### S3 => S3_Prime : ( unpack( "H2", $s3 ) . " => " . unpack( "H2", $s3_prime ) )
+
+    return [ $s0_prime, $s1_prime, $s2_prime, $s3_prime ];
+}
+
 sub _AddRoundKey {
     my $self         = shift;
     my $state        = shift;
