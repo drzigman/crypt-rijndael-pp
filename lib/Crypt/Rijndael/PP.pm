@@ -67,7 +67,12 @@ sub encrypt_block {
     my $input = shift;
     my $key   = shift;
 
-    my $num_rounds = 10;
+    my $bits_in_initial_key = length( unpack("H*", $key ) ) * 4;
+    my $words_in_key        = $bits_in_initial_key / ( 8 * 4 );
+    my $number_of_rounds    =  $NUM_ROUNDS->{ $bits_in_initial_key };
+    #### Number of Bits in Initial Key : ( $bits_in_initial_key )
+    #### Words In Initial Key          : ( $words_in_key )
+    #### Number of Rounds              : ( $number_of_rounds )
 
     my $state        = $self->_input_to_state( $input );
     ### Inital State: ( generate_printable_state( $state ) )
@@ -78,7 +83,7 @@ sub encrypt_block {
     $self->_AddRoundKey($state, $key_schedule, 0);
     ### State After Round 0 AddRoundKey: ( generate_printable_state( $state ) )
 
-    for( my $round = 1; $round < $num_rounds; $round++ ) {
+    for( my $round = 1; $round < $number_of_rounds; $round++ ) {
         ### Processing Round Number: ( $round )
 
         $self->_SubBytes( $state );
@@ -102,7 +107,7 @@ sub encrypt_block {
     $self->_ShiftRows( $state );
     ### State after ShiftRows: ( generate_printable_state( $state ) )
 
-    $self->_AddRoundKey( $state, $key_schedule, $num_rounds );
+    $self->_AddRoundKey( $state, $key_schedule, $number_of_rounds );
     ### State after AddRoundKey: ( generate_printable_state( $state ) )
 
     return $self->_state_to_output( $state );
