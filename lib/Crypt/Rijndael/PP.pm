@@ -424,4 +424,27 @@ sub _state_to_output {
     return $output;
 }
 
+sub _InvShiftRows {
+    my $self  = shift;
+    my $state = shift;
+
+    # Row 0 does not shift
+    for( my $row_index = 1; $row_index < 4; $row_index++ ) {
+        $self->_inv_shift_row( $state->[$row_index], $row_index );
+    }
+
+    return $state;
+}
+sub _inv_shift_row {
+    my $self      = shift;
+    my $row       = shift;
+    my $num_bytes = shift;
+
+    for( my $shift_round = 0; $shift_round < $num_bytes; $shift_round++ ) {
+        unshift ( @{ $row }, pop @{ $row });
+    }
+
+    return $row;
+}
+
 1;
