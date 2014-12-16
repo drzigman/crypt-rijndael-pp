@@ -88,9 +88,12 @@ sub blocksize {
 sub new {
     my $class = shift;
     my $key   = shift;
+    my $mode  = shift // MODE_ECB();
 
     my $self = {
-        key => $key,
+        key  => $key,
+        mode => $mode,
+        iv   => undef,
     };
 
     bless $self, $class;
@@ -102,9 +105,33 @@ sub MODE_ECB {
     return 1;
 }
 
+sub MODE_CBC {
+    return 2;
+}
+
+sub set_iv {
+    my $self = shift;
+    my $iv   = shift;
+
+    if( length( $iv ) != 16 ) {
+        croak 'set_iv: initial value must be the blocksize (16 bytes), but was '
+            . length( $iv ) . ' bytes';
+    }
+
+    $self->{iv} = $iv;
+}
+
 sub encrypt {
-    my $self  = shift;
-    my $input = shift;
+    my $self       = shift;
+    my $plain_text = shift;
+
+    my $input;
+    if( $self->{mode} == MODE_ECB() ) {
+        $input = $plain_text;
+    }
+    elsif( $self->{mode} == MODE_CBC() ) {
+        $input = $plain_text ^ $self->{iv};
+    }
 
     return $self->encrypt_block( $input, $self->{key} );
 }
