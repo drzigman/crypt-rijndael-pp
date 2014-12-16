@@ -122,18 +122,27 @@ sub set_iv {
 }
 
 sub encrypt {
-    my $self       = shift;
-    my $plain_text = shift;
+    my $self  = shift;
+    my $input = shift;
 
-    my $input;
-    if( $self->{mode} == MODE_ECB() ) {
-        $input = $plain_text;
-    }
-    elsif( $self->{mode} == MODE_CBC() ) {
-        $input = $plain_text ^ $self->{iv};
+    my $last_block = $self->{iv};
+    if( $self->{mode} == MODE_CBC() ) {
+        $last_block = $self->{iv};
     }
 
-    return $self->encrypt_block( $input, $self->{key} );
+    my $cipher_text = '';
+    for( my $block_index = 0; $block_index < ( length($input) / 16 ); $block_index++ ) {
+        my $block = substr( $input, $block_index * 16, 16 );
+
+        if( $self->{mode} == MODE_CBC() ) {
+            $block = $block ^ $last_block;
+        }
+
+        $last_block = $self->encrypt_block( $block, $self->{key} );
+        $cipher_text .= $last_block;
+    }
+
+    return $cipher_text;
 }
 
 sub encrypt_block {
