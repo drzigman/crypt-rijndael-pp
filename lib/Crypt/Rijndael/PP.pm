@@ -145,6 +145,34 @@ sub encrypt {
     return $cipher_text;
 }
 
+sub decrypt {
+    my $self  = shift;
+    my $input = shift;
+
+    my $last_cipher_block;
+
+    my $plain_text = '';
+    for( my $block_index = 0; $block_index < ( length($input) / 16 ); $block_index++ ) {
+        my $cipher_block = substr( $input, $block_index * 16, 16 );
+
+        my $plain_block = $self->decrypt_block( $cipher_block, $self->{key} );
+
+        if( $self->{mode} eq MODE_CBC() ) {
+            if( $block_index == 0 ) {
+                $plain_block = $plain_block ^ $self->{iv};
+            }
+            else {
+                $plain_block = $plain_block ^ $last_cipher_block;
+            }
+        }
+
+        $last_cipher_block = $cipher_block;
+        $plain_text       .= $plain_block;
+    }
+
+    return $plain_text;
+}
+
 sub encrypt_block {
     my $self  = shift;
     my $input = shift;
