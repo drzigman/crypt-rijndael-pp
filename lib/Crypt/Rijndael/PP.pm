@@ -113,6 +113,10 @@ sub MODE_CTR {
     return 3;
 }
 
+sub MODE_CFB {
+    return 4;
+}
+
 sub set_iv {
     my $self = shift;
     my $iv   = shift;
@@ -164,6 +168,9 @@ sub encrypt {
     }
     elsif( $self->{mode} == MODE_CTR() ) {
         return $self->_encrypt_mode_ctr( $input );
+    }
+    elsif( $self->{mode} == MODE_CFB() ) {
+        return $self->_encrypt_mode_cfb( $input );
     }
     else {
         croak "Invalid Mode specified";
@@ -231,6 +238,25 @@ sub _encrypt_mode_ctr {
     return $cipher_text;
 }
 
+sub _encrypt_mode_cfb {
+    my $self  = shift;
+    my $input = shift;
+
+    my $last_block = $self->{iv};
+
+    my $cipher_text = '';
+    for( my $block_index = 0; $block_index < ( length($input) / 16 ); $block_index++ ) {
+        my $block = substr( $input, $block_index * 16, 16 );
+
+        my $cfb_block = $self->encrypt_block( $last_block, $self->{key} );
+
+        $last_block  = $block ^ $cfb_block;
+        $cipher_text .= $last_block;
+    }
+
+    return $cipher_text;
+}
+
 sub decrypt {
     my $self  = shift;
     my $input = shift;
@@ -243,6 +269,9 @@ sub decrypt {
     }
     elsif( $self->{mode} == MODE_CTR() ) {
         return $self->_decrypt_mode_ctr( $input );
+    }
+    elsif( $self->{mode} == MODE_CFB() ) {
+        return $self->_decrypt_mode_cfb( $input );
     }
     else {
         croak "Invalid Mode specified";
@@ -294,6 +323,25 @@ sub _decrypt_mode_ctr {
     my $input = shift;
 
     return $self->_encrypt_mode_ctr( $input );
+}
+
+sub _decrypt_mode_cfb {
+    my $self  = shift;
+    my $input = shift;
+
+    my $last_block = $self->{iv};
+
+    my $plain_text = '';
+    for( my $block_index = 0; $block_index < ( length($input) / 16 ); $block_index++ ) {
+        my $cipher_block = substr( $input, $block_index * 16, 16 );
+
+        my $cfb_block = $self->encrypt_block( $last_block, $self->{key} );
+
+        $last_block = $cipher_block;
+        $plain_text .= $cfb_block ^ $cipher_block;
+    }
+
+    return $plain_text;
 }
 
 sub encrypt_block {
