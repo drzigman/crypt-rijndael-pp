@@ -136,7 +136,7 @@ sub test_rijndael_pp_encryption {
     );
 
     my $cipher_text;
-    subtest 'Encrypt With Crypt::Rijndal' => sub {
+    subtest 'Encrypt With Crypt::Rijndal::PP' => sub {
         my $packed_key = pack( "C*", @{ $args{key} } );
         my $packed_plain_text  = pack( "C*", @{ $args{plain_text} } );
         my $packed_cipher_text = pack( "C*", @{ $args{cipher_text} } );
@@ -176,7 +176,7 @@ sub test_rijndael_pp_decryption {
     );
 
     my $plain_text;
-    subtest 'Decrypt With Crypt::Rijndal' => sub {
+    subtest 'Decrypt With Crypt::Rijndal::PP' => sub {
         my $packed_key = pack( "C*", @{ $args{key} } );
         my $packed_plain_text  = pack( "C*", @{ $args{plain_text} } );
         my $packed_cipher_text = pack( "C*", @{ $args{cipher_text} } );

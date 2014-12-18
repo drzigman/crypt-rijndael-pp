@@ -109,6 +109,10 @@ sub MODE_CBC {
     return 2;
 }
 
+sub MODE_CTR {
+    return 3;
+}
+
 sub set_iv {
     my $self = shift;
     my $iv   = shift;
@@ -121,31 +125,145 @@ sub set_iv {
     $self->{iv} = $iv;
 }
 
+sub _increment_nonce {
+    my $self         = shift;
+    my $packed_nonce = shift;
+
+    my @nonce_parts = unpack( 'N4', $packed_nonce );
+
+    ### Nonce Part 0 : unpack( 'A4', $nonce_parts[0] ) . ' - ' . unpack( 'B32', $nonce_parts[0] )
+    ### Nonce Part 1 : unpack( 'A4', $nonce_parts[1] ) . ' - ' . unpack( 'B32', $nonce_parts[1] )
+    ### Nonce Part 2 : unpack( 'A4', $nonce_parts[2] ) . ' - ' . unpack( 'B32', $nonce_parts[2] )
+    ### Nonce Part 3 : unpack( 'A4', $nonce_parts[3] ) . ' - ' . unpack( 'B32', $nonce_parts[3] )
+
+    for my $nonce_part_index ( 0 .. 3 ) {
+        my $original_nonce_part = $nonce_parts[ 3 - $nonce_part_index ];
+        $nonce_parts[ 3 - $nonce_part_index ]++;
+
+        ### Nonce Part Index       : ( $nonce_part_index )
+        ### Original Nonce Part    : unpack( 'A4', $original_nonce_part ) . ' - ' . unpack( 'B32', $original_nonce_part )
+        ### Incremented Nonce Part : unpack( 'A4', $nonce_parts[ 3 - $nonce_part_index ] ) . ' - ' . unpack( 'B32', $nonce_parts[ 3 - $nonce_part_index ] )
+
+        if( $original_nonce_part < $nonce_parts[ 3 - $nonce_part_index ] ) {
+            last;
+        }
+    }
+
+    return pack( 'N4', @nonce_parts );
+}
+
 sub encrypt {
     my $self  = shift;
     my $input = shift;
 
-    my $last_block = $self->{iv};
-    if( $self->{mode} == MODE_CBC() ) {
-        $last_block = $self->{iv};
+    if( $self->{mode} == MODE_ECB() ) {
+        return $self->_encrypt_mode_ecb( $input );
     }
+    elsif( $self->{mode} == MODE_CBC() ) {
+        return $self->_encrypt_mode_cbc( $input );
+    }
+    elsif( $self->{mode} == MODE_CTR() ) {
+        return $self->_encrypt_mode_ctr( $input );
+    }
+    else {
+        croak "Invalid Mode specified";
+    }
+}
+
+sub _encrypt_mode_ecb {
+    my $self  = shift;
+    my $input = shift;
 
     my $cipher_text = '';
     for( my $block_index = 0; $block_index < ( length($input) / 16 ); $block_index++ ) {
         my $block = substr( $input, $block_index * 16, 16 );
 
-        if( $self->{mode} == MODE_CBC() ) {
-            $block = $block ^ $last_block;
-        }
+        $cipher_text .= $self->encrypt_block( $block, $self->{key} );
+    }
+
+    return $cipher_text;
+}
+
+sub _encrypt_mode_cbc {
+    my $self  = shift;
+    my $input = shift;
+
+    my $last_block = $self->{iv};
+
+    my $cipher_text = '';
+    for( my $block_index = 0; $block_index < ( length($input) / 16 ); $block_index++ ) {
+        my $block = substr( $input, $block_index * 16, 16 );
+
+        $block = $block ^ $last_block;
 
         $last_block = $self->encrypt_block( $block, $self->{key} );
+
         $cipher_text .= $last_block;
     }
 
     return $cipher_text;
 }
 
+sub _encrypt_mode_ctr {
+    my $self  = shift;
+    my $input = shift;
+
+    my $nonce = $self->{iv};
+
+    my $cipher_text = '';
+    for( my $block_index = 0; $block_index < ( length($input) / 16 ); $block_index++ ) {
+        my $block = substr( $input, $block_index * 16, 16 );
+
+        my $packed_nonce   = pack( 'A16', $nonce );
+
+        ### Nonce : ( $nonce )
+        ### Nonce Bit String : ( unpack( 'B128', $packed_nonce ) )
+
+        my $ctr_block = $self->encrypt_block( unpack( 'A16', $packed_nonce ), $self->{key} );
+
+        $cipher_text .= $ctr_block ^ $block;
+        $packed_nonce = $self->_increment_nonce( $packed_nonce );
+
+        ### Nonce + 1 Bit String: ( unpack( 'B128', $packed_nonce ) )
+        $nonce = unpack('A16', $packed_nonce );
+    }
+
+    return $cipher_text;
+}
+
 sub decrypt {
+    my $self  = shift;
+    my $input = shift;
+
+    if( $self->{mode} == MODE_ECB() ) {
+        return $self->_decrypt_mode_ecb( $input );
+    }
+    elsif( $self->{mode} == MODE_CBC() ) {
+        return $self->_decrypt_mode_cbc( $input );
+    }
+    elsif( $self->{mode} == MODE_CTR() ) {
+        return $self->_decrypt_mode_ctr( $input );
+    }
+    else {
+        croak "Invalid Mode specified";
+    }
+}
+
+sub _decrypt_mode_ecb {
+    my $self  = shift;
+    my $input = shift;
+
+    my $plain_text = '';
+    for( my $block_index = 0; $block_index < ( length($input) / 16 ); $block_index++ ) {
+        my $cipher_block = substr( $input, $block_index * 16, 16 );
+
+        $plain_text .= $self->decrypt_block( $cipher_block, $self->{key} );
+    }
+
+    return $plain_text;
+}
+
+sub _decrypt_mode_cbc {
     my $self  = shift;
     my $input = shift;
 
@@ -157,13 +275,11 @@ sub decrypt {
 
         my $plain_block = $self->decrypt_block( $cipher_block, $self->{key} );
 
-        if( $self->{mode} eq MODE_CBC() ) {
-            if( $block_index == 0 ) {
-                $plain_block = $plain_block ^ $self->{iv};
-            }
-            else {
-                $plain_block = $plain_block ^ $last_cipher_block;
-            }
+        if( $block_index == 0 ) {
+            $plain_block = $plain_block ^ $self->{iv};
+        }
+        else {
+            $plain_block = $plain_block ^ $last_cipher_block;
         }
 
         $last_cipher_block = $cipher_block;
@@ -171,6 +287,13 @@ sub decrypt {
     }
 
     return $plain_text;
+}
+
+sub _decrypt_mode_ctr {
+    my $self  = shift;
+    my $input = shift;
+
+    return $self->_encrypt_mode_ctr( $input );
 }
 
 sub encrypt_block {
@@ -181,45 +304,45 @@ sub encrypt_block {
     my $bits_in_initial_key = length( unpack("H*", $key ) ) * 4;
     my $words_in_key        = $bits_in_initial_key / ( 8 * 4 );
     my $number_of_rounds    =  $NUM_ROUNDS->{ $bits_in_initial_key };
-    #### Number of Bits in Initial Key : ( $bits_in_initial_key )
-    #### Words In Initial Key          : ( $words_in_key )
-    #### Number of Rounds              : ( $number_of_rounds )
+    ##### Number of Bits in Initial Key : ( $bits_in_initial_key )
+    ##### Words In Initial Key          : ( $words_in_key )
+    ##### Number of Rounds              : ( $number_of_rounds )
 
     my $state        = $self->_input_to_state( $input );
-    ### Inital State: ( generate_printable_state( $state ) )
+    #### Inital State: ( generate_printable_state( $state ) )
 
     my $key_schedule = $self->_ExpandKey( $key );
-    ### Key Schedule: ( unpack("H*", $key_schedule ) )
+    #### Key Schedule: ( unpack("H*", $key_schedule ) )
 
     $self->_AddRoundKey($state, $key_schedule, 0);
-    ### State After Round 0 AddRoundKey: ( generate_printable_state( $state ) )
+    #### State After Round 0 AddRoundKey: ( generate_printable_state( $state ) )
 
     for( my $round = 1; $round < $number_of_rounds; $round++ ) {
-        ### Processing Round Number: ( $round )
+        #### Processing Round Number: ( $round )
 
         $self->_SubBytes( $state );
-        ### State after SubBytes: ( generate_printable_state( $state ) )
+        #### State after SubBytes: ( generate_printable_state( $state ) )
 
         $self->_ShiftRows( $state );
-        ### State after ShiftRows: ( generate_printable_state( $state ) )
+        #### State after ShiftRows: ( generate_printable_state( $state ) )
 
         $self->_MixColumns( $state );
-        ### State after MixColumns: ( generate_printable_state( $state ) )
+        #### State after MixColumns: ( generate_printable_state( $state ) )
 
         $self->_AddRoundKey( $state, $key_schedule, $round );
-        ### State after AddRoundKey: ( generate_printable_state( $state ) )
+        #### State after AddRoundKey: ( generate_printable_state( $state ) )
     }
 
-    ### Performing final transforms...
+    #### Performing final transforms...
 
     $self->_SubBytes( $state );
-    ### State after SubBytes: ( generate_printable_state( $state ) )
+    #### State after SubBytes: ( generate_printable_state( $state ) )
 
     $self->_ShiftRows( $state );
-    ### State after ShiftRows: ( generate_printable_state( $state ) )
+    #### State after ShiftRows: ( generate_printable_state( $state ) )
 
     $self->_AddRoundKey( $state, $key_schedule, $number_of_rounds );
-    ### State after AddRoundKey: ( generate_printable_state( $state ) )
+    #### State after AddRoundKey: ( generate_printable_state( $state ) )
 
     return $self->_state_to_output( $state );
 }
@@ -232,45 +355,45 @@ sub decrypt_block {
     my $bits_in_initial_key = length( unpack("H*", $key ) ) * 4;
     my $words_in_key        = $bits_in_initial_key / ( 8 * 4 );
     my $number_of_rounds    =  $NUM_ROUNDS->{ $bits_in_initial_key };
-    #### Number of Bits in Initial Key : ( $bits_in_initial_key )
-    #### Words In Initial Key          : ( $words_in_key )
-    #### Number of Rounds              : ( $number_of_rounds )
+    ##### Number of Bits in Initial Key : ( $bits_in_initial_key )
+    ##### Words In Initial Key          : ( $words_in_key )
+    ##### Number of Rounds              : ( $number_of_rounds )
 
     my $state        = $self->_input_to_state( $input );
-    ### Inital State: ( generate_printable_state( $state ) )
+    #### Inital State: ( generate_printable_state( $state ) )
 
     my $key_schedule = $self->_ExpandKey( $key );
-    ### Key Schedule: ( unpack("H*", $key_schedule ) )
+    #### Key Schedule: ( unpack("H*", $key_schedule ) )
 
     $self->_AddRoundKey($state, $key_schedule, $number_of_rounds);
-    ### State After Round 0 AddRoundKey: ( generate_printable_state( $state ) )
+    #### State After Round 0 AddRoundKey: ( generate_printable_state( $state ) )
 
     for( my $round = $number_of_rounds - 1; $round > 0; $round-- ) {
-        ### Processing Round Number: ( $round )
+        #### Processing Round Number: ( $round )
 
         $self->_InvShiftRows( $state );
-        ### State After InvShiftRows: ( generate_printable_state( $state ) )
+        #### State After InvShiftRows: ( generate_printable_state( $state ) )
 
         $self->_InvSubBytes( $state );
-        ### State After InvSubBytes: ( generate_printable_state( $state ) )
+        #### State After InvSubBytes: ( generate_printable_state( $state ) )
 
         $self->_AddRoundKey( $state, $key_schedule, $round );
-        ### State After AddRoundKey: ( generate_printable_state( $state ) )
+        #### State After AddRoundKey: ( generate_printable_state( $state ) )
 
         $self->_InvMixColumns( $state );
-        ### State After InvMixColumns: ( generate_printable_state( $state ) )
+        #### State After InvMixColumns: ( generate_printable_state( $state ) )
     }
 
-    ### Performing final transforms...
+    #### Performing final transforms...
 
     $self->_InvShiftRows( $state );
-    ### State After InvShiftRows: ( generate_printable_state( $state ) )
+    #### State After InvShiftRows: ( generate_printable_state( $state ) )
 
     $self->_InvSubBytes( $state );
-    ### State After InvSubBytes: ( generate_printable_state( $state ) )
+    #### State After InvSubBytes: ( generate_printable_state( $state ) )
 
     $self->_AddRoundKey( $state, $key_schedule, 0 );
-    ### State After AddRoundKey: ( generate_printable_state( $state ) )
+    #### State After AddRoundKey: ( generate_printable_state( $state ) )
 
     return $self->_state_to_output( $state );
 }
@@ -306,12 +429,12 @@ sub _sub_bytes {
                 ( hex($x) * 16 ) + hex($y)
             ]);
 
-            #### Row Index        : ( $row_index )
-            #### Column Index     : ( $column_index )
-            #### X Coordinate     : ( $x )
-            #### Y Coordinate     : ( $y )
-            #### Original Byte    : ( unpack "H2", $original_byte )
-            #### Substituted Byte : ( unpack "H2", $substituted_byte )
+            ##### Row Index        : ( $row_index )
+            ##### Column Index     : ( $column_index )
+            ##### X Coordinate     : ( $x )
+            ##### Y Coordinate     : ( $y )
+            ##### Original Byte    : ( unpack "H2", $original_byte )
+            ##### Substituted Byte : ( unpack "H2", $substituted_byte )
 
             $state->[$row_index][$column_index] = $substituted_byte;
         }
@@ -380,7 +503,7 @@ sub _mix_column {
         ^ pack( "C", $s2 )
         ^ pack( "C", $s3 );
 
-    #### S0 => S0_Prime : ( unpack( "H2", $s0 ) . " => " . unpack( "H2", $s0_prime ) )
+    ##### S0 => S0_Prime : ( unpack( "H2", $s0 ) . " => " . unpack( "H2", $s0_prime ) )
 
     my $s1_prime =
           pack( "C", $s0 )
@@ -388,7 +511,7 @@ sub _mix_column {
         ^ pack( "C", gf_multiply( 0x03, $s2 ) )
         ^ pack( "C", $s3 );
 
-    #### S1 => S1_Prime : ( unpack( "H2", $s1 ) . " => " . unpack( "H2", $s1_prime ) )
+    ##### S1 => S1_Prime : ( unpack( "H2", $s1 ) . " => " . unpack( "H2", $s1_prime ) )
 
     my $s2_prime =
           pack( "C", $s0 )
@@ -396,7 +519,7 @@ sub _mix_column {
         ^ pack( "C", gf_multiply( 0x02, $s2 ) )
         ^ pack( "C", gf_multiply( 0x03, $s3 ) );
 
-    #### S2 => S2_Prime : ( unpack( "H2", $s2 ) . " => " . unpack( "H2", $s2_prime ) )
+    ##### S2 => S2_Prime : ( unpack( "H2", $s2 ) . " => " . unpack( "H2", $s2_prime ) )
 
     my $s3_prime =
           pack( "C", gf_multiply( 0x03, $s0 ) )
@@ -404,7 +527,7 @@ sub _mix_column {
         ^ pack( "C", $s2 )
         ^ pack( "C", gf_multiply( 0x02, $s3 ) );
 
-    #### S3 => S3_Prime : ( unpack( "H2", $s3 ) . " => " . unpack( "H2", $s3_prime ) )
+    ##### S3 => S3_Prime : ( unpack( "H2", $s3 ) . " => " . unpack( "H2", $s3_prime ) )
 
     return [ $s0_prime, $s1_prime, $s2_prime, $s3_prime ];
 }
@@ -445,7 +568,7 @@ sub _inv_mix_column {
         ^ pack( "C", gf_multiply( 0x0d, $s2 ) )
         ^ pack( "C", gf_multiply( 0x09, $s3 ) );
 
-    #### S0 => S0_Prime : ( unpack( "H2", $s0 ) . " => " . unpack( "H2", $s0_prime ) )
+    ##### S0 => S0_Prime : ( unpack( "H2", $s0 ) . " => " . unpack( "H2", $s0_prime ) )
 
     my $s1_prime =
           pack( "C", gf_multiply( 0x09, $s0 ) )
@@ -453,7 +576,7 @@ sub _inv_mix_column {
         ^ pack( "C", gf_multiply( 0x0b, $s2 ) )
         ^ pack( "C", gf_multiply( 0x0d, $s3 ) );
 
-    #### S1 => S1_Prime : ( unpack( "H2", $s1 ) . " => " . unpack( "H2", $s1_prime ) )
+    ##### S1 => S1_Prime : ( unpack( "H2", $s1 ) . " => " . unpack( "H2", $s1_prime ) )
 
     my $s2_prime =
           pack( "C", gf_multiply( 0x0d, $s0 ) )
@@ -461,7 +584,7 @@ sub _inv_mix_column {
         ^ pack( "C", gf_multiply( 0x0e, $s2 ) )
         ^ pack( "C", gf_multiply( 0x0b, $s3 ) );
 
-    #### S2 => S2_Prime : ( unpack( "H2", $s2 ) . " => " . unpack( "H2", $s2_prime ) )
+    ##### S2 => S2_Prime : ( unpack( "H2", $s2 ) . " => " . unpack( "H2", $s2_prime ) )
 
     my $s3_prime =
           pack( "C", gf_multiply( 0x0b, $s0 ) )
@@ -469,7 +592,7 @@ sub _inv_mix_column {
         ^ pack( "C", gf_multiply( 0x09, $s2 ) )
         ^ pack( "C", gf_multiply( 0x0e, $s3 ) );
 
-    #### S3 => S3_Prime : ( unpack( "H2", $s3 ) . " => " . unpack( "H2", $s3_prime ) )
+    ##### S3 => S3_Prime : ( unpack( "H2", $s3 ) . " => " . unpack( "H2", $s3_prime ) )
 
     return [ $s0_prime, $s1_prime, $s2_prime, $s3_prime ];
 }
@@ -481,11 +604,11 @@ sub _AddRoundKey {
     my $round        = shift;
 
     my $relevant_key_schedule = substr( $key_schedule, ($round * 16), 16 );
-    #### Full Key Schedule : ( unpack("H*", $key_schedule ) )
-    #### Relevant Portion of Key Schedule : ( unpack("H*", $relevant_key_schedule ) )
+    ##### Full Key Schedule : ( unpack("H*", $key_schedule ) )
+    ##### Relevant Portion of Key Schedule : ( unpack("H*", $relevant_key_schedule ) )
 
     for( my $column = 0; $column < 4; $column++ ) {
-        #### Processing Column : ( $column )
+        ##### Processing Column : ( $column )
 
         my $key_word     = substr( $relevant_key_schedule, ($column * 4 ), 4 );
         my $state_column = pack( "C4", (
@@ -494,24 +617,24 @@ sub _AddRoundKey {
             unpack( "C", $state->[2][$column] ),
             unpack( "C", $state->[3][$column] ),
         ) );
-        #### Key Word     : ( unpack("B*", $key_word ) . " - " . unpack("H*", $key_word ) )
-        #### State Column : ( unpack("B*", $state_column ) . " - " . unpack("H*", $state_column ) )
+        ##### Key Word     : ( unpack("B*", $key_word ) . " - " . unpack("H*", $key_word ) )
+        ##### State Column : ( unpack("B*", $state_column ) . " - " . unpack("H*", $state_column ) )
 
         my $int_key_word     = unpack( "N1", $key_word );
         my $int_state_column = unpack( "N1", $state_column );
         my $xored_column     = $int_key_word ^ $int_state_column;
-        #### Int Key Word     : ( unpack("B*", pack( "N", $int_key_word ) ) . " - " . unpack("H*", pack( "N", $int_key_word ) ) )
-        #### Int State Column : ( unpack("B*", pack( "N", $int_state_column ) ) . " - " . unpack("H*", pack( "N", $int_state_column ) ) )
-        #### XOR'ed Column    : ( unpack("B*", pack( "N", $xored_column ) ) . " - " . unpack("H*", pack( "N", $xored_column ) ) )
+        ##### Int Key Word     : ( unpack("B*", pack( "N", $int_key_word ) ) . " - " . unpack("H*", pack( "N", $int_key_word ) ) )
+        ##### Int State Column : ( unpack("B*", pack( "N", $int_state_column ) ) . " - " . unpack("H*", pack( "N", $int_state_column ) ) )
+        ##### XOR'ed Column    : ( unpack("B*", pack( "N", $xored_column ) ) . " - " . unpack("H*", pack( "N", $xored_column ) ) )
 
         $state->[0][$column] = pack("C", unpack( "x0C", pack( "N1", $xored_column ) ) );
         $state->[1][$column] = pack("C", unpack( "x1C", pack( "N1", $xored_column ) ) );
         $state->[2][$column] = pack("C", unpack( "x2C", pack( "N1", $xored_column ) ) );
         $state->[3][$column] = pack("C", unpack( "x3C", pack( "N1", $xored_column ) ) );
-        #### Value of State Row 0 : ( unpack("H*", $state->[0][$column] ) )
-        #### Value of State Row 1 : ( unpack("H*", $state->[1][$column] ) )
-        #### Value of State Row 2 : ( unpack("H*", $state->[2][$column] ) )
-        #### Value of State Row 3 : ( unpack("H*", $state->[3][$column] ) )
+        ##### Value of State Row 0 : ( unpack("H*", $state->[0][$column] ) )
+        ##### Value of State Row 1 : ( unpack("H*", $state->[1][$column] ) )
+        ##### Value of State Row 2 : ( unpack("H*", $state->[2][$column] ) )
+        ##### Value of State Row 3 : ( unpack("H*", $state->[3][$column] ) )
     }
 
     return $state;
@@ -521,7 +644,7 @@ sub _ExpandKey {
     my $self = shift;
     my $key  = shift;
 
-    #### Initial Key: ( unpack("H*", $key ) )
+    ##### Initial Key: ( unpack("H*", $key ) )
 
     my $expanded_key = $key;
 
@@ -529,51 +652,51 @@ sub _ExpandKey {
     my $bits_in_initial_key = length( unpack("H*", $key ) ) * 4;
     my $words_in_key        = $bits_in_initial_key / ( 8 * 4 );
     my $number_of_rounds    = 4 * ( $NUM_ROUNDS->{ $bits_in_initial_key  } + 1);
-    #### Number of Bits in Initial Key : ( $bits_in_initial_key )
-    #### Words In Initial Key          : ( $words_in_key )
-    #### Number of Rounds              : ( $number_of_rounds )
+    ##### Number of Bits in Initial Key : ( $bits_in_initial_key )
+    ##### Words In Initial Key          : ( $words_in_key )
+    ##### Number of Rounds              : ( $number_of_rounds )
 
     for( my $expansion_round = $words_in_key; $expansion_round < $number_of_rounds; $expansion_round++ ) {
-        #### Expansion Round: ( $expansion_round )
+        ##### Expansion Round: ( $expansion_round )
 
         my $temp = substr( $expanded_key, ($expansion_round * 4) - 4, 4 );
-        #### Temp         : ( unpack("B*", $temp ) . " - " . unpack("H*", $temp ) )
+        ##### Temp         : ( unpack("B*", $temp ) . " - " . unpack("H*", $temp ) )
 
         if( $expansion_round % $words_in_key == 0 ) {
-            #### Performing Transformation...
+            ##### Performing Transformation...
 
             my $rotted_word = $self->_RotWord( $temp );
-            #### Rotted Word  : ( unpack("B*", $rotted_word ) . " - " . unpack("H*", $rotted_word ) )
+            ##### Rotted Word  : ( unpack("B*", $rotted_word ) . " - " . unpack("H*", $rotted_word ) )
 
             my $subbed_word = $self->_SubWord( $rotted_word );
-            #### Subbed Word  : ( unpack("B*", $subbed_word ) . " - " . unpack("H*", $subbed_word ) )
+            ##### Subbed Word  : ( unpack("B*", $subbed_word ) . " - " . unpack("H*", $subbed_word ) )
 
             my $int_subbed_word = unpack( "N1", $subbed_word );
             $temp = $int_subbed_word ^ $RCONST[ $expansion_round / $words_in_key ];
-            #### Int Subbed Word : ( unpack("B*", pack( "N", $int_subbed_word ) ) . " - " . unpack("H*", pack( "N", $int_subbed_word ) ) )
-            #### Index into RCON : ( $expansion_round / $words_in_key )
-            #### RCON            : ( unpack("B*", pack( "N", $RCONST[$expansion_round / $words_in_key] ) ) . " - " . unpack("H*", pack( "N", $RCONST[$expansion_round / $words_in_key] ) ) )
-            #### Xored Result    : ( unpack("B*", pack( "N", $temp ) ) . " - " . unpack("H*", pack("N", $temp ) ) )
+            ##### Int Subbed Word : ( unpack("B*", pack( "N", $int_subbed_word ) ) . " - " . unpack("H*", pack( "N", $int_subbed_word ) ) )
+            ##### Index into RCON : ( $expansion_round / $words_in_key )
+            ##### RCON            : ( unpack("B*", pack( "N", $RCONST[$expansion_round / $words_in_key] ) ) . " - " . unpack("H*", pack( "N", $RCONST[$expansion_round / $words_in_key] ) ) )
+            ##### Xored Result    : ( unpack("B*", pack( "N", $temp ) ) . " - " . unpack("H*", pack("N", $temp ) ) )
 
             $temp = pack("N1", $temp );
-            #### Temp : ( unpack("B*", $temp ) . " - " . unpack("H*", $temp ) )
+            ##### Temp : ( unpack("B*", $temp ) . " - " . unpack("H*", $temp ) )
         }
         elsif( $words_in_key > 6 && $expansion_round % $words_in_key == 4 ) {
-            #### Performing 256 Bit Transform...
+            ##### Performing 256 Bit Transform...
 
             $temp = $self->_SubWord( $temp );
-            #### Subbed Word  : ( unpack("B*", $temp ) . " - " . unpack("H*", $temp ) )
+            ##### Subbed Word  : ( unpack("B*", $temp ) . " - " . unpack("H*", $temp ) )
         }
 
         my $previous_word     = substr( $expanded_key, ($expansion_round * 4) - ( $words_in_key * 4 ), 4 );
         my $int_previous_word = unpack( "N1", $previous_word );
         my $new_word          = $int_previous_word ^ unpack("N1", $temp);
-        #### Previous Word     : ( unpack("B*", $previous_word) . " - " . unpack("H*", $previous_word ) )
-        #### Int Previous Word : ( unpack("B*", pack("N", $int_previous_word)) . " - " . unpack("H*", pack("N", $int_previous_word ) ) )
-        #### New Word          : ( unpack("B*", pack("N", $new_word ) ) . " - " . unpack("H*", pack("N", $new_word ) ) )
+        ##### Previous Word     : ( unpack("B*", $previous_word) . " - " . unpack("H*", $previous_word ) )
+        ##### Int Previous Word : ( unpack("B*", pack("N", $int_previous_word)) . " - " . unpack("H*", pack("N", $int_previous_word ) ) )
+        ##### New Word          : ( unpack("B*", pack("N", $new_word ) ) . " - " . unpack("H*", pack("N", $new_word ) ) )
 
         $expanded_key .= pack("N1", $new_word);
-        #### Expanded Key : ( unpack("H*", $expanded_key ) )
+        ##### Expanded Key : ( unpack("H*", $expanded_key ) )
     }
 
     return $expanded_key;
@@ -595,11 +718,11 @@ sub _SubWord {
             ( 16 * hex($x) ) + hex($y)
         ]);
 
-        #### Byte Index       : ( $byte_index )
-        #### X Coordinate     : ( $x )
-        #### Y Coordinate     : ( $y )
-        #### Original Byte    : ( unpack "H2", $original_byte )
-        #### Substituted Byte : ( unpack "H2", $substituted_byte )
+        ##### Byte Index       : ( $byte_index )
+        ##### X Coordinate     : ( $x )
+        ##### Y Coordinate     : ( $y )
+        ##### Original Byte    : ( unpack "H2", $original_byte )
+        ##### Substituted Byte : ( unpack "H2", $substituted_byte )
 
         $subbed_word .= $substituted_byte;
     }
@@ -625,8 +748,8 @@ sub _input_to_state {
     my $self  = shift;
     my $input = shift;
 
-    #### Input           : ( unpack( "H*", $input ) )
-    #### Length of Input : ( length $input )
+    ##### Input           : ( unpack( "H*", $input ) )
+    ##### Length of Input : ( length $input )
 
     if( length $input != 16 ) {
         croak "Invalid Input Length, Must be 128 Bits";
@@ -639,11 +762,11 @@ sub _input_to_state {
         for( my $row_index = 0; $row_index < 4; $row_index++ ) {
             my $byte = unpack("x" . ( $byte_index++ ) . "a", $input );
 
-            #### Row Index    : ( $row_index )
-            #### Column Index : ( $column_index )
-            #### Byte Index   : ( $byte_index )
-            #### Raw Byte     : ( $byte )
-            #### Byte         : ( unpack "H2", $byte )
+            ##### Row Index    : ( $row_index )
+            ##### Column Index : ( $column_index )
+            ##### Byte Index   : ( $byte_index )
+            ##### Raw Byte     : ( $byte )
+            ##### Byte         : ( unpack "H2", $byte )
 
             $state->[$row_index][$column_index] = $byte;
         }
