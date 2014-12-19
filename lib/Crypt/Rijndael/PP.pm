@@ -12,6 +12,8 @@ use Carp;
 use Crypt::Rijndael::PP::GF qw( gf_multiply );
 use Crypt::Rijndael::PP::Debug qw( generate_printable_state );
 
+use Crypt::Random::Source qw(get_weak);
+
 use Readonly;
 #<<< Don't Tidy S Boxes
 Readonly my @SBOX => (
@@ -89,7 +91,7 @@ sub new {
     my $self = {
         key  => $key,
         mode => $mode,
-        iv   => undef,
+        iv   => get_weak(16),
     };
 
     bless $self, $class;
@@ -135,6 +137,12 @@ sub set_iv {
     }
 
     $self->{iv} = $iv;
+}
+
+sub get_iv {
+    my $self = shift;
+
+    return $self->{iv};
 }
 
 sub _increment_nonce {
