@@ -14,6 +14,7 @@ our @EXPORT_OK = qw(
     $KEYS
 
     $CIPHER_TEXT
+    $CBC_CIPHER_TEXT
 );
 
 use Readonly;

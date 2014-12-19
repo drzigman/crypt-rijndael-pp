@@ -81,10 +81,6 @@ Readonly my $NUM_ROUNDS => {
     256 => 14,
 };
 
-sub blocksize {
-    return 16;
-}
-
 sub new {
     my $class = shift;
     my $key   = shift;
@@ -119,6 +115,14 @@ sub MODE_CFB {
 
 sub MODE_OFB {
     return 5;
+}
+
+sub blocksize {
+    return 16;
+}
+
+sub keysize {
+    return 32;
 }
 
 sub set_iv {
