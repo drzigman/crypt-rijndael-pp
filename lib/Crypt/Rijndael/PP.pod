@@ -126,7 +126,7 @@ If you aren't a member of your local L<Perl Mongers|http://www.pm.org/> you real
 
 =head1 ACKNOWLEDGEMENTS
 
-None of this would be possible with the excellent Rijndael algorithm written by Joan Daemen and Vincent Rijmen.
+None of this would be possible without the excellent Rijndael algorithm written by Joan Daemen and Vincent Rijmen.
 
 Special thanks to L<brian d foy|http://www252.pair.com/~comdog/> for his faith and entrusting me with the Crypt::Rijndael module, the L<Houston Perl Mongers|http://houston.pm.org/> for allowing me to present to them my initial implementation, and to L<HostGator|http://www.hostgator.com> and L<BrainStorm Incubator|http://brainstormincubator.com> for providing development resources.
 
