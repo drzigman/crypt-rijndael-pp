@@ -6,40 +6,43 @@ Crypt::Rijndael::PP - Pure Perl Implementation of the Rijndael Encryption Algort
 
 =head1 SYNOPSIS
 
-    use Crypt::Rinjdael::PP;
+    use Crypt::Rijndael::PP;
 
     # Please use securely generated keys and IV's, these are purely examples!!!
     my $key   = 'A' x 32;
     my $input = 'B' x 16;
 
     # For you hardcore low level 'I want to control everything!' types:
-    my $iv = 'A' x 16;
+    {
+        my $iv = 'A' x 16;
 
-    # If you aren't sure which mode to use, use CBC (Chaining Block Cipher)
-    my $cipher = Crypt::Rijndael::PP->new(
-        $key, Crypt::Rinjdael::PP::MODE_CBC()
-    );
+        # If you aren't sure which mode to use, use CBC (Chaining Block Cipher)
+        my $cipher = Crypt::Rijndael::PP->new(
+            $key, Crypt::Rijndael::PP::MODE_CBC()
+        );
 
-    $cipher->set_iv( $iv );
+        $cipher->set_iv( $iv );
 
-    my $cipher_text = $cipher->encrypt( $input );
-    my $plain_text  = $cipher->decrypt( $cipher_text );
+        my $cipher_text = $cipher->encrypt( $input );
+        my $plain_text  = $cipher->decrypt( $cipher_text );
+    }
 
     # For you, 'do it for me' types: 
-    my $cipher = Crypt::CBC->new(
-        -key    => $key,
-        -cipher => 'Rijndael::PP',
-    );
+    {
+        my $cipher = Crypt::CBC->new(
+            -key    => $key,
+            -cipher => 'Rijndael::PP',
+        );
 
-    my $cipher_text = $cipher->encrypt( $input );
-    my $plain_text  = $cipher->decrypt( $cipher_text );
-
+        my $cipher_text = $cipher->encrypt( $input );
+        my $plain_text  = $cipher->decrypt( $cipher_text );
+    }
 
 =head1 DESCRIPTION
 
-Crypt::Rinjdael::PP is a pure perl drop in alternative to Crypt::Rinjdael, fully compatiable with L<Crypt::CBC>.  It exposes the exact same functionatly and can be used in place for any use case where you can not use the XS version of the Rinjdael module.
+Crypt::Rijndael::PP is a pure perl drop in alternative to Crypt::Rijndael, fully compatiable with L<Crypt::CBC>.  It exposes the exact same functionatly and can be used in place for any use case where you can not use the XS version of the Rijndael module.
 
-Though named Crypt::Rinjdae::PP, this module implements the Advanced Encryption Standard (AES) and is suitable for all of your strong cryptographic needs.  It will accept either a 128, 192, or 256 bit key and inputs that are multiples of the blocksize (which is 16 bytes).  This module B<WILL NOT> perform padding for you, if you need that functionatly consider using L<Crypt::CBC> with the 'Rinjdael::PP' cipher under the hood.  The following encryption modes are available.
+Though named Crypt::Rinjdae::PP, this module implements the Advanced Encryption Standard (AES) and is suitable for all of your strong cryptographic needs.  It will accept either a 128, 192, or 256 bit key and inputs that are multiples of the blocksize (which is 16 bytes).  This module B<WILL NOT> perform padding for you, if you need that functionatly consider using L<Crypt::CBC> with the 'Rijndael::PP' cipher under the hood.  The following encryption modes are available.
 
 =over 4
 
@@ -69,11 +72,11 @@ Similiar to CFB, but uses the the result of the cipher algorthim before XOR'ing 
 
 =head2 new
 
-    my $cipher = Crypt::Rinjdael::PP->new(
-        $key, Crypt::Rinjdael::PP::MODE_ECB(),
+    my $cipher = Crypt::Rijndael::PP->new(
+        $key, Crypt::Rijndael::PP::MODE_ECB(),
     )
 
-Generates an instance of Crypt::Rinjdael::PP, accepts the key and the mode to use.
+Generates an instance of Crypt::Rijndael::PP, accepts the key and the mode to use.
 
 =head2 encypt
 
@@ -101,7 +104,7 @@ Gets the current IV.
 
 =head1 COMPATABILITY
 
-Crypt::Rinjdael::PP is intended to be fully compatable with Crypt::Rinjdael, and is fully compatable with Crypt::CBC when using 256 bit keys.
+Crypt::Rijndael::PP is intended to be fully compatable with Crypt::Rijndael, and is fully compatable with Crypt::CBC when using 256 bit keys.
 
 =head1 REPOSITORY and BUG REPORTING
 
@@ -125,7 +128,7 @@ If you aren't a member of your local L<Perl Mongers|http://www.pm.org/> you real
 
 None of this would be possible with the excellent Rijndael algorithm written by Joan Daemen and Vincent Rijmen.
 
-Special thanks to L<brian d foy|http://www252.pair.com/~comdog/> for his faith and entrusting me with the Crypt::Rijndael module, the L<Houston Perl Mongers|http://houston.pm.org/> for allowing me to present to them my initial implementation, and to L<HostGator|http://www.hostgator.com> and L<BrainStorm Incubator> for providing development resources.
+Special thanks to L<brian d foy|http://www252.pair.com/~comdog/> for his faith and entrusting me with the Crypt::Rijndael module, the L<Houston Perl Mongers|http://houston.pm.org/> for allowing me to present to them my initial implementation, and to L<HostGator|http://www.hostgator.com> and L<BrainStorm Incubator|http://brainstormincubator.com> for providing development resources.
 
 =head1 AUTHORS
 

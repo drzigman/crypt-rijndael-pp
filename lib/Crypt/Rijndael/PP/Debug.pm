@@ -6,6 +6,9 @@ use warnings;
 use Exporter 'import';
 our @EXPORT_OK = qw( generate_printable_state );
 
+# VERSION
+# ABSTRACT: Debugging and Formatting Methods
+
 sub generate_printable_state {
     my $state = shift;
 

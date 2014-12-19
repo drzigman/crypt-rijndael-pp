@@ -9,6 +9,9 @@ use Carp;
 use Exporter 'import';
 our @EXPORT_OK = qw( gf_multiply );
 
+# VERSION
+# ABSTRACT: Constants and Methods for Galois Field
+
 use Readonly;
 #<<< Don't Tidy the Precomputed Values
 Readonly my $PRECOMPUTED => {

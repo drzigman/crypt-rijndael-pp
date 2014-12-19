@@ -14,6 +14,9 @@ use Crypt::Rijndael::PP::Debug qw( generate_printable_state );
 
 use Crypt::Random::Source qw(get_weak);
 
+# VERSION
+# ABSTRACT: Pure Perl Implementation of the Rijndael Cipher
+
 use Readonly;
 #<<< Don't Tidy S Boxes
 Readonly my @SBOX => (
@@ -137,6 +140,8 @@ sub set_iv {
     }
 
     $self->{iv} = $iv;
+
+    return $self;
 }
 
 sub get_iv {
@@ -176,6 +181,7 @@ sub encrypt {
     my $self  = shift;
     my $input = shift;
 
+    ## no critic (ControlStructures::ProhibitCascadingIfElse)
     if( $self->{mode} == MODE_ECB() ) {
         return $self->_encrypt_mode_ecb( $input );
     }
@@ -194,6 +200,7 @@ sub encrypt {
     else {
         croak "Invalid Mode specified";
     }
+    ## use critic
 }
 
 sub _encrypt_mode_ecb {
@@ -299,6 +306,7 @@ sub decrypt {
     my $self  = shift;
     my $input = shift;
 
+    ## no critic (ControlStructures::ProhibitCascadingIfElse)
     if( $self->{mode} == MODE_ECB() ) {
         return $self->_decrypt_mode_ecb( $input );
     }
@@ -317,6 +325,7 @@ sub decrypt {
     else {
         croak "Invalid Mode specified";
     }
+    ## use critic
 }
 
 sub _decrypt_mode_ecb {
@@ -398,10 +407,9 @@ sub encrypt_block {
     my $key   = shift;
 
     my $bits_in_initial_key = length( unpack("H*", $key ) ) * 4;
-    my $words_in_key        = $bits_in_initial_key / ( 8 * 4 );
-    my $number_of_rounds    =  $NUM_ROUNDS->{ $bits_in_initial_key };
+    my $number_of_rounds    = $NUM_ROUNDS->{ $bits_in_initial_key };
     ##### Number of Bits in Initial Key : ( $bits_in_initial_key )
-    ##### Words In Initial Key          : ( $words_in_key )
+    ##### Words In Initial Key          : ( $bits_in_initial_key / ( 8 * 4 ) )
     ##### Number of Rounds              : ( $number_of_rounds )
 
     my $state        = $self->_input_to_state( $input );
@@ -449,10 +457,9 @@ sub decrypt_block {
     my $key   = shift;
 
     my $bits_in_initial_key = length( unpack("H*", $key ) ) * 4;
-    my $words_in_key        = $bits_in_initial_key / ( 8 * 4 );
-    my $number_of_rounds    =  $NUM_ROUNDS->{ $bits_in_initial_key };
+    my $number_of_rounds    = $NUM_ROUNDS->{ $bits_in_initial_key };
     ##### Number of Bits in Initial Key : ( $bits_in_initial_key )
-    ##### Words In Initial Key          : ( $words_in_key )
+    ##### Words In Initial Key          : ( $bits_in_initial_key / ( 8 * 4 ) )
     ##### Number of Rounds              : ( $number_of_rounds )
 
     my $state        = $self->_input_to_state( $input );
