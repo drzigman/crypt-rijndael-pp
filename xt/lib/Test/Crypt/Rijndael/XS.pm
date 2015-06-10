@@ -1,4 +1,4 @@
-package Test::Crypt::Rijndael;
+package Test::Crypt::Rijndael::XS;
 
 use strict;
 use warnings;
@@ -7,12 +7,12 @@ use Test::More;
 use Test::Exception;
 use MooseX::Params::Validate;
 
-use Crypt::Rijndael::PP;
+use Crypt::Rijndael;
 
 use Exporter 'import';
-our @EXPORT_OK = qw( test_rijndael_pp_encryption_and_decryption );
+our @EXPORT_OK = qw( test_rijndael_xs_encryption_and_decryption );
 
-sub test_rijndael_pp_encryption_and_decryption {
+sub test_rijndael_xs_encryption_and_decryption {
     my ( %args ) = validated_hash(
         \@_,
         key   => { isa => 'ArrayRef' },
@@ -22,12 +22,12 @@ sub test_rijndael_pp_encryption_and_decryption {
         cipher_text => { isa => 'ArrayRef' },
     );
 
-    my $cipher_text = test_rijndael_pp_encryption( %args );
-    my $plain_text  = test_rijndael_pp_decryption( %args );
+    my $cipher_text = test_rijndael_xs_encryption( %args );
+    my $plain_text  = test_rijndael_xs_decryption( %args );
     return;
 }
 
-sub test_rijndael_pp_encryption {
+sub test_rijndael_xs_encryption {
     my ( %args ) = validated_hash(
         \@_,
         key   => { isa => 'ArrayRef' },
@@ -38,16 +38,16 @@ sub test_rijndael_pp_encryption {
     );
 
     my $cipher_text;
-    subtest 'Encrypt With Crypt::Rijndal::PP' => sub {
+    subtest 'Encrypt With Crypt::Rijndal' => sub {
         my $packed_key = pack( "C*", @{ $args{key} } );
         my $packed_plain_text  = pack( "C*", @{ $args{plain_text} } );
         my $packed_cipher_text = pack( "C*", @{ $args{cipher_text} } );
 
-        my $mode = eval 'Crypt::Rijndael::PP::' . $args{mode}; ## no critic (ProhibitStringyEval)
+        my $mode = eval 'Crypt::Rijndael::' . $args{mode}; ## no critic (ProhibitStringyEval)
 
         my $cipher;
         lives_ok {
-            $cipher = Crypt::Rijndael::PP->new(
+            $cipher = Crypt::Rijndael->new(
                 $packed_key, $mode
             );
 
@@ -67,7 +67,7 @@ sub test_rijndael_pp_encryption {
     return $cipher_text;
 }
 
-sub test_rijndael_pp_decryption {
+sub test_rijndael_xs_decryption {
     my ( %args ) = validated_hash(
         \@_,
         key   => { isa => 'ArrayRef' },
@@ -78,16 +78,16 @@ sub test_rijndael_pp_decryption {
     );
 
     my $plain_text;
-    subtest 'Decrypt With Crypt::Rijndal::PP' => sub {
+    subtest 'Decrypt With Crypt::Rijndal' => sub {
         my $packed_key = pack( "C*", @{ $args{key} } );
         my $packed_plain_text  = pack( "C*", @{ $args{plain_text} } );
         my $packed_cipher_text = pack( "C*", @{ $args{cipher_text} } );
 
-        my $mode = eval 'Crypt::Rijndael::PP::' . $args{mode}; ## no critic (ProhibitStringyEval)
+        my $mode = eval 'Crypt::Rijndael::' . $args{mode}; ## no critic (ProhibitStringyEval)
 
         my $cipher;
         lives_ok {
-            $cipher = Crypt::Rijndael::PP->new(
+            $cipher = Crypt::Rijndael->new(
                 $packed_key, $mode
             );
 
@@ -106,4 +106,6 @@ sub test_rijndael_pp_decryption {
 
     return $plain_text;
 }
+
 1;
+

@@ -8,7 +8,7 @@ use Test::Exception;
 use MooseX::Params::Validate;
 
 use FindBin;
-use lib "$FindBin::Bin/../lib/";
+use lib "$FindBin::Bin/../../../t/lib/";
 use Test::Crypt::Rijndael::Constant qw(
     $INPUT_BLOCKS
     $KEY_256_BIT

@@ -6,8 +6,12 @@ use warnings;
 use Test::More;
 
 use FindBin;
-use lib "$FindBin::Bin/../lib/";
-use Test::Crypt::Rijndael qw( test_rijndael_pp_encryption_and_decryption );
+use lib "$FindBin::Bin/../../lib/";
+use Test::Crypt::Rijndael::XS qw(
+    test_rijndael_xs_encryption_and_decryption
+);
+
+use lib "$FindBin::Bin/../../../t/lib/";
 use Test::Crypt::Rijndael::Constant qw(
     $DEFAULT_IV
     $INPUT_BLOCKS
@@ -15,17 +19,17 @@ use Test::Crypt::Rijndael::Constant qw(
     $CIPHER_TEXT
 );
 
-use Crypt::Rijndael::PP;
+use Crypt::Rijndael;
 
 subtest 'Encryption with 128 Bit Key' => sub {
     for my $num_blocks ( 1, 2, 3 ) {
         subtest "$num_blocks Blocks" => sub {
-            test_rijndael_pp_encryption_and_decryption(
+            test_rijndael_xs_encryption_and_decryption(
                 key   => $KEYS->{128},
-                mode  => 'MODE_CFB',
+                mode  => 'MODE_CTR',
                 iv    => $DEFAULT_IV,
                 plain_text  => $INPUT_BLOCKS->{$num_blocks},
-                cipher_text => $CIPHER_TEXT->{CFB}{$num_blocks}{128},
+                cipher_text => $CIPHER_TEXT->{CTR}{$num_blocks}{128},
             );
         };
     }
@@ -34,12 +38,12 @@ subtest 'Encryption with 128 Bit Key' => sub {
 subtest 'Encryption with 192 Bit Key' => sub {
     for my $num_blocks ( 1, 2, 3 ) {
         subtest "$num_blocks Blocks" => sub {
-            test_rijndael_pp_encryption_and_decryption(
+            test_rijndael_xs_encryption_and_decryption(
                 key   => $KEYS->{192},
-                mode  => 'MODE_CFB',
+                mode  => 'MODE_CTR',
                 iv    => $DEFAULT_IV,
                 plain_text  => $INPUT_BLOCKS->{$num_blocks},
-                cipher_text => $CIPHER_TEXT->{CFB}{$num_blocks}{192},
+                cipher_text => $CIPHER_TEXT->{CTR}{$num_blocks}{192},
             );
         };
     }
@@ -48,12 +52,12 @@ subtest 'Encryption with 192 Bit Key' => sub {
 subtest 'Encryption with 256 Bit Key' => sub {
     for my $num_blocks ( 1, 2, 3 ) {
         subtest "$num_blocks Blocks" => sub {
-            test_rijndael_pp_encryption_and_decryption(
+            test_rijndael_xs_encryption_and_decryption(
                 key   => $KEYS->{256},
-                mode  => 'MODE_CFB',
+                mode  => 'MODE_CTR',
                 iv    => $DEFAULT_IV,
                 plain_text  => $INPUT_BLOCKS->{$num_blocks},
-                cipher_text => $CIPHER_TEXT->{CFB}{$num_blocks}{256},
+                cipher_text => $CIPHER_TEXT->{CTR}{$num_blocks}{256},
             );
         };
     }
