@@ -89,7 +89,11 @@ Readonly my $NUM_ROUNDS => {
 sub new {
     my $class = shift;
     my $key   = shift;
-    my $mode  = shift // MODE_ECB();
+    my $mode  = shift;
+
+    if( !$mode ) {
+        $mode = MODE_ECB();
+    }
 
     my $self = {
         key  => $key,
